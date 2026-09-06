@@ -63,7 +63,23 @@ python s12_appdata.py   # → appdata.json
 
 ## 배포
 
-정적 사이트라 빌드가 없습니다. Vercel 에서 저장소를 연결하면 `public/` 이 그대로 서빙됩니다.
+**https://paperdeck-kohl.vercel.app**
+
+정적 사이트라 빌드가 없습니다.
+
+```bash
+cp datasets/<이름>.json public/data/ek.json
+vercel deploy --prod --yes
+```
+
+### 반드시 production 도메인을 쓸 것
+
+무료(Hobby) 플랜에서는 Vercel Authentication + Standard Protection 이 적용되어
+**자동 배정된 production 도메인만 공개**되고, 수동으로 만든 alias 나 배포별 URL은
+Vercel 로그인 화면으로 리다이렉트됩니다. 공유할 주소는 `vercel ls` 가 알려주는
+production 도메인(`paperdeck-kohl.vercel.app`)입니다.
+
+`paperdeck.vercel.app` 은 **다른 사람의 프로젝트**입니다. 혼동하지 마세요.
 
 ## 알려진 한계
 

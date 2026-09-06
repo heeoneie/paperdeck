@@ -1,0 +1,6 @@
+# 배포에 불필요한 것만 제외합니다.
+# 주의: public/data/ 는 여기 넣지 마세요 — 앱이 읽는 문제 데이터입니다.
+datasets/
+tools/
+README.md
+.git/
