@@ -1,5 +1,7 @@
 # 문제집에서 추출한 데이터는 저장소에 올리지 않습니다 (저작권)
+# public/data/ 는 Vercel CLI 배포에는 포함되지만 GitHub 에는 올라가지 않습니다
 datasets/*.json
+public/data/
 datasets/*.pdf
 *.pdf
 clean.pdf

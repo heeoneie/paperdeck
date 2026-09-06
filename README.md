@@ -70,3 +70,22 @@ python s12_appdata.py   # → appdata.json
 - 진도가 기기 사이에서 이어지지 않습니다 (localStorage / IndexedDB).
 - 서술형·그림 문제는 자동 채점이 안 됩니다.
 - 임의의 문제집 PDF 입력은 아직 지원하지 않습니다.
+
+## 데이터를 배포에만 넣기
+
+`public/data/ek.json` 은 `.gitignore` 대상이라 GitHub 에는 올라가지 않지만,
+**Vercel CLI 배포에는 포함됩니다.** Vercel CLI 는 `.gitignore` 가 아니라
+`.vercelignore` 만 보고 나머지 파일을 전부 업로드하기 때문입니다.
+
+```bash
+cp datasets/<이름>.json public/data/ek.json
+vercel --prod            # 로컬 파일이 그대로 올라감
+```
+
+앱은 시작할 때 `data/ek.json` 을 먼저 찾고, 없으면 파일 불러오기 화면을 띄웁니다.
+
+> **주의** — GitHub 연동(자동 배포)을 켜면 push 마다 저장소 내용으로 다시 배포되어
+> `public/data/` 가 사라집니다. 데이터를 배포에 포함하려면 **CLI 배포만** 쓰세요.
+>
+> 배포 URL 은 링크를 아는 누구나 접근할 수 있습니다. `robots.txt` 와 `noindex` 로
+> 검색 노출만 막아둔 상태이며, 접근 제한은 아닙니다.

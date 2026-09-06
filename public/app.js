@@ -392,11 +392,36 @@ function acceptFile(f) {
   fr.readAsText(f);
 }
 
+/* 배포본에 데이터가 동봉돼 있으면 자동으로 받아 쓴다.
+   (저장소에는 올리지 않고 Vercel CLI 배포에만 포함) */
+var BUNDLED = 'data/ek.json';
+
 function boot() {
   loadProg();
   idbGet(DSK).then(function (d) {
-    if (d && d.items) { setData(d); home(); } else { show('load'); }
-  }).catch(function () { show('load'); });
+    if (d && d.items) { setData(d); home(); return; }
+    return tryBundled();
+  }).catch(function () { return tryBundled(); });
+}
+
+function tryBundled() {
+  var st = $('#lstat');
+  show('load');
+  st.textContent = '문제를 받는 중…';
+  return fetch(BUNDLED, { cache: 'force-cache' }).then(function (r) {
+    if (!r.ok) throw 0;
+    return r.json();
+  }).then(function (j) {
+    if (!j || !Array.isArray(j.items)) throw 0;
+    st.textContent = '준비하는 중…';
+    setData(j);
+    return idbSet(DSK, j).catch(function () {}).then(function () { home(); });
+  }).catch(function () {
+    st.textContent = '';
+    $('#drop').style.display = '';
+    $('#lhint').style.display = '';
+    show('load');
+  });
 }
 
 $('#file').addEventListener('change', function () { acceptFile(this.files[0]); });
