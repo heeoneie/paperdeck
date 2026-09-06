@@ -1,0 +1,19 @@
+# 문제집에서 추출한 데이터는 저장소에 올리지 않습니다 (저작권)
+datasets/*.json
+datasets/*.pdf
+*.pdf
+clean.pdf
+blocks.pkl
+built.pkl
+appdata.json
+
+# 파이썬
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# 기타
+.DS_Store
+.vercel
+node_modules/
