@@ -63,7 +63,7 @@ python s12_appdata.py   # → appdata.json
 
 ## 배포
 
-**https://paperdeck-kohl.vercel.app**
+**https://paperdeck-app.vercel.app**
 
 정적 사이트라 빌드가 없습니다.
 
@@ -72,14 +72,23 @@ cp datasets/<이름>.json public/data/ek.json
 vercel deploy --prod --yes
 ```
 
-### 반드시 production 도메인을 쓸 것
+### 주소 관련 함정
 
-무료(Hobby) 플랜에서는 Vercel Authentication + Standard Protection 이 적용되어
-**자동 배정된 production 도메인만 공개**되고, 수동으로 만든 alias 나 배포별 URL은
-Vercel 로그인 화면으로 리다이렉트됩니다. 공유할 주소는 `vercel ls` 가 알려주는
-production 도메인(`paperdeck-kohl.vercel.app`)입니다.
+무료(Hobby) 플랜은 Vercel Authentication + Standard Protection 이 적용되어
+**프로젝트 도메인만 공개**되고, 배포별 URL(`*-<해시>-*.vercel.app`)과
+`vercel alias set` 으로 만든 alias 는 Vercel 로그인 화면으로 리다이렉트됩니다.
 
-`paperdeck.vercel.app` 은 **다른 사람의 프로젝트**입니다. 혼동하지 마세요.
+깔끔한 주소를 원하면 **alias 가 아니라 프로젝트 도메인으로 추가**해야 합니다.
+
+```bash
+vercel domains add paperdeck-app.vercel.app paperdeck-app   # 공개됨
+vercel alias  set  <deployment> paperdeck-app.vercel.app    # 로그인 벽에 막힘
+```
+
+프로젝트 이름을 바꿔도(`vercel project rename`) 처음 배정된 도메인은 그대로입니다.
+
+- `paperdeck.vercel.app` 은 **다른 사람의 서비스**입니다 (`/d/default` 로 리다이렉트).
+- `paperdeck-kohl.vercel.app` 은 최초 자동 배정 도메인으로 아직 살아 있습니다.
 
 ## 알려진 한계
 
