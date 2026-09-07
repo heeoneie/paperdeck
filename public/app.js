@@ -435,14 +435,17 @@ function tryBundled() {
   var st = $('#lstat');
   show('load');
   st.textContent = '문제를 받는 중…';
-  return fetch(BUNDLED, { cache: 'force-cache' }).then(function (r) {
+  return fetch(BUNDLED, { cache: 'no-cache' }).then(function (r) {
     if (!r.ok) throw 0;
     return r.json();
   }).then(function (j) {
     if (!j || !Array.isArray(j.items)) throw 0;
     st.textContent = '준비하는 중…';
     setData(j);
-    return idbSet(DSK, j).catch(function () {}).then(function () { home(); });
+    return idbSet(DSK, j).catch(function () {}).then(function () {
+      home();
+      checkUpdate(j.v);
+    });
   }).catch(function () {
     st.textContent = '';
     $('#drop').style.display = '';
