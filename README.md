@@ -68,9 +68,14 @@ python s12_appdata.py   # → appdata.json
 정적 사이트라 빌드가 없습니다.
 
 ```bash
-cp datasets/<이름>.json public/data/ek.json
+python tools/publish-dataset.py appdata.json "전기기사 실기 단답형" "2001~2026년 기출"
 vercel deploy --prod --yes
 ```
+
+`publish-dataset.py` 는 `public/data/ek.json` 과 함께 **`version.json`** 을 만듭니다.
+앱은 시작할 때 캐시된 데이터를 바로 쓰고, 뒤에서 `version.json` 을 확인해
+버전이 다르면 조용히 새 데이터를 받아 교체합니다. 이 파일을 갱신하지 않으면
+이미 앱을 열어본 사람은 **예전 데이터를 계속 보게 됩니다.**
 
 ### 주소 관련 함정
 
@@ -89,6 +94,18 @@ vercel alias  set  <deployment> paperdeck-app.vercel.app    # 로그인 벽에 �
 
 - `paperdeck.vercel.app` 은 **다른 사람의 서비스**입니다 (`/d/default` 로 리다이렉트).
 - `paperdeck-kohl.vercel.app` 은 최초 자동 배정 도메인으로 아직 살아 있습니다.
+
+## 진도 저장
+
+문제를 **채점하는 즉시** `localStorage['pd_prog']` 에 기록됩니다.
+'다음 문제' 를 누르지 않고 앱을 닫아도 남고, '맞게 처리' 로 정정하면 갱신됩니다.
+
+```jsonc
+{ "차단기 약호|2026년 2회|2": { "n": 1, "ok": 1, "rate": 100, "last": 1788763790391 } }
+//  문제 키(제목|회차|페이지)      시도  전부맞음  정답률   마지막 시각
+```
+
+입력한 답 자체와 세션 중간 위치는 저장하지 않습니다.
 
 ## 알려진 한계
 

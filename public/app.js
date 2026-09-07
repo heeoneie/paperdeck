@@ -235,6 +235,7 @@ function gradeNow() {
     paintBlank(b, r.v, r.a || b.a);
   });
   S.graded = true;
+  record(true);
   $('#act').textContent = (S.pos + 1 < S.list.length) ? '다음 문제 →' : '결과 보기';
   $('#skip').style.display = 'none';
   tally();
@@ -272,9 +273,12 @@ function tally() {
   });
   $('#res').innerHTML = tot ? ('맞은 칸 <b class="' + (ok === tot ? 'g' : 'r') + '">' +
                                ok + '</b> / ' + tot) : '';
+  if (S.graded) record(false);
 }
 
-function next() {
+/* 채점하는 즉시 기록한다. '다음 문제' 를 누르지 않고 앱을 닫아도 남는다. */
+function record(firstTime) {
+  if (!S.list.length) return;
   var it = S.list[S.pos], k = key(it), ok = 0, tot = 0;
   it.b.forEach(function (b) {
     var m = S.marks[b.k];
@@ -282,10 +286,15 @@ function next() {
     tot++; if (m === 'ok') ok++;
   });
   var p = prog[k] || { n: 0, ok: 0, last: 0 };
-  p.n++; p.last = Date.now();
+  if (firstTime) p.n++;
+  p.last = Date.now();
   p.ok = (tot && ok === tot) ? 1 : 0;
   p.rate = tot ? Math.round(ok / tot * 100) : null;
   prog[k] = p; save();
+}
+
+function next() {
+  record(false);
   if (S.pos + 1 < S.list.length) { S.pos++; paint(); }
   else finish();
 }
@@ -399,9 +408,27 @@ var BUNDLED = 'data/ek.json';
 function boot() {
   loadProg();
   idbGet(DSK).then(function (d) {
-    if (d && d.items) { setData(d); home(); return; }
+    if (d && d.items) { setData(d); home(); checkUpdate(d.v); return; }
     return tryBundled();
   }).catch(function () { return tryBundled(); });
+}
+
+/* 캐시된 데이터가 낡았는지 뒤에서 확인하고, 다르면 조용히 받아 교체한다.
+   version.json 은 수십 바이트라 매번 받아도 부담이 없다. */
+function checkUpdate(have) {
+  fetch('data/version.json', { cache: 'no-store' }).then(function (r) {
+    return r.ok ? r.json() : null;
+  }).then(function (m) {
+    if (!m || !m.v || m.v === have) return;
+    return fetch(BUNDLED, { cache: 'no-store' }).then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || !Array.isArray(j.items)) return;
+        return idbSet(DSK, j).then(function () {
+          setData(j);
+          if ($('#scr-home').classList.contains('on')) home();
+        });
+      });
+  }).catch(function () {});
 }
 
 function tryBundled() {
@@ -439,5 +466,11 @@ $('#swap').onclick = function () {
   if (!confirm('다른 문제집 데이터로 바꿉니다. 진도 기록은 남아 있습니다.')) return;
   idbDel(DSK).then(function () { DATA = null; IT = []; MED = {}; $('#lstat').textContent = ''; show('load'); });
 };
+
+/* 탭을 닫거나 백그라운드로 보낼 때 안전망 */
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'hidden') save();
+});
+window.addEventListener('pagehide', save);
 
 boot();
