@@ -71,7 +71,9 @@ for pi in range(D.page_count):
             continue
         if cur is None:
             continue
-        if txt.startswith('과년도'):
+        # 회차가 많아 두 줄로 접히면 '과년도' 가 줄 중간으로 밀린다.
+        # startswith 로 보면 그 블록의 태그를 통째로 놓친다.
+        if '과년도' in txt:
             cur['tags'] = TAG.findall(txt)
             cur['pages'].add(pi)
             blocks.append(cur)
