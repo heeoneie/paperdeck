@@ -69,8 +69,13 @@ python s12_appdata.py   # → appdata.json
 
 ```bash
 python tools/publish-dataset.py appdata.json "전기기사 실기 단답형" "2001~2026년 기출"
+python tools/stamp-assets.py     # 코드를 고쳤다면
 vercel deploy --prod --yes
 ```
+
+`stamp-assets.py` 는 `index.html` 의 `app.js` / `app.css` 링크에 내용 해시를 붙입니다
+(`app.js?v=52e622c5a1`). `index.html` 은 항상 재검증되므로 코드가 바뀌면 링크가 바뀌어
+**브라우저가 옛 코드를 계속 실행하는 일이 생기지 않습니다.**
 
 `publish-dataset.py` 는 `public/data/ek.json` 과 함께 **`version.json`** 을 만듭니다.
 앱은 시작할 때 캐시된 데이터를 바로 쓰고, 뒤에서 `version.json` 을 확인해
