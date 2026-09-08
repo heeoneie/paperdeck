@@ -146,6 +146,81 @@ function renderQ(it) {
   return h;
 }
 
+/* 빈칸을 정답으로 채워 보여준다 (개념 보기 전용) */
+function renderSolved(it) {
+  var h = fillMedia(it.h);
+  h = h.replace(/<table class="tb">/g, '<div class="tw"><table class="tb">')
+       .replace(/<\/table>/g, '</table></div>');
+  return h.replace(/<span class="bk" data-b="(\d+)"><\/span>/g, function (m, k) {
+    var b = it.b[+k];
+    if (!b) return '';
+    return b.t === 'img' ? fillMedia(b.a)
+                         : '<span class="sol-in">' + b.a + '</span>';
+  });
+}
+
+/* ---------- 개념 ---------- */
+var CS = { sort: 'n', q: '' };
+
+function concepts() {
+  var g = {};
+  IT.forEach(function (it) { (g[it.t] = g[it.t] || []).push(it); });
+  return Object.keys(g).map(function (t) {
+    var list = g[t];
+    var ys = [];
+    list.forEach(function (it) { ys = ys.concat(it.y); });
+    ys = ys.filter(function (v, i) { return ys.indexOf(v) === i; }).sort();
+    return { t: t, list: list, n: list.length, lo: ys[0], hi: ys[ys.length - 1] };
+  });
+}
+
+function paintConcepts() {
+  var all = concepts();
+  $('#csub').textContent = '개념 ' + all.length + '개 · 문제 ' + IT.length +
+                           '개 · 답이 다 보입니다';
+  var q = CS.q.replace(/\s/g, '').toLowerCase();
+  var rows = all.filter(function (c) {
+    return !q || c.t.replace(/\s/g, '').toLowerCase().indexOf(q) >= 0;
+  });
+  rows.sort(function (a, b) {
+    if (CS.sort === 'a') return a.t.localeCompare(b.t, 'ko');
+    if (CS.sort === 'y') return (b.hi || '').localeCompare(a.hi || '') || b.n - a.n;
+    return b.n - a.n || a.t.localeCompare(b.t, 'ko');
+  });
+  $('#clist').innerHTML = rows.length ? rows.map(function (c) {
+    var span = c.lo === c.hi ? '20' + c.hi : '20' + c.lo + '~20' + c.hi;
+    return '<div class="crow" data-t="' + esc(c.t).replace(/"/g, '&quot;') + '">' +
+           '<span class="cname">' + esc(c.t) + '</span>' +
+           '<span class="cmeta"><b>' + c.n + '문제</b>' + span + '</span></div>';
+  }).join('') : '<div class="cempty">찾는 개념이 없습니다</div>';
+  $$('#clist .crow').forEach(function (r) {
+    r.onclick = function () { openConcept(r.dataset.t); };
+  });
+}
+
+function openConcept(title) {
+  var list = IT.filter(function (it) { return it.t === title; });
+  /* 최근 회차가 앞으로 */
+  function newest(it) { return it.y.slice().sort().reverse()[0] || '00'; }
+  list.sort(function (a, b) { return newest(b).localeCompare(newest(a)); });
+
+  var h = ['<div class="chead"><h1>◇ ' + esc(title) + '</h1>' +
+           '<div class="sub1">' + list.length + '문제 · 답이 다 보입니다</div></div>'];
+  list.forEach(function (it) {
+    h.push('<div class="cyear"><b>' + esc(it.r[0]) + '</b><i></i>' +
+           (it.r.length > 1 ? '<span>같은 문제 ' + it.r.length + '회 출제</span>' : '') +
+           '</div>');
+    h.push('<div class="citem">' + renderSolved(it) +
+           (it.r.length > 1 ? '<div class="note" style="margin:10px 0 0">출제: ' +
+             esc(it.r.join(' · ')) + '</div>' : '') + '</div>');
+  });
+  $('#cdetail').innerHTML = h.join('');
+  $('#tt').textContent = title;
+  $('#ts').textContent = '개념 · ' + list.length + '문제';
+  $('#pbar').style.width = '100%';
+  show('concept');
+}
+
 /* ---------- 상태 ---------- */
 var S = { list: [], pos: 0, graded: false, marks: {}, label: '' };
 
@@ -156,14 +231,18 @@ function startSession(list, label) {
 }
 function show(n) {
   $$('.scr').forEach(function (e) { e.classList.toggle('on', e.id === 'scr-' + n); });
-  $('#top').style.display = (n === 'home') ? 'none' : '';
+  /* 상단바가 필요 없는 화면 */
+  var bare = (n === 'home' || n === 'load' || n === 'concepts');
+  $('#top').style.display = bare ? 'none' : '';
+  $('#bot').style.display = (n === 'study') ? '' : 'none';
   if (n === 'done') {
     $('#tt').textContent = '결과';
     $('#ts').textContent = S.label + ' · ' + S.list.length + '문제';
     $('#pbar').style.width = '100%';
   }
-  $('#bot').style.display = (n === 'study') ? '' : 'none';
-  if (n === 'load') $('#top').style.display = 'none';
+  $$('.tabs button').forEach(function (b) {
+    b.classList.toggle('on', b.dataset.go === (n === 'concept' ? 'concepts' : n));
+  });
   window.scrollTo(0, 0);
 }
 
@@ -365,7 +444,24 @@ function home() {
 /* ---------- 배선 ---------- */
 $('#act').onclick = doAct;
 $('#skip').onclick = function () { gradeNow(); };
-$('#back').onclick = function () { if (confirm('풀이를 그만두고 홈으로 갈까요?')) home(); };
+$('#back').onclick = function () {
+  if ($('#scr-concept').classList.contains('on')) { show('concepts'); return; }
+  if (confirm('풀이를 그만두고 홈으로 갈까요?')) home();
+};
+$$('.tabs button').forEach(function (b) {
+  b.onclick = function () {
+    if (b.dataset.go === 'home') home();
+    else { paintConcepts(); show('concepts'); }
+  };
+});
+$('#csearch').addEventListener('input', function () { CS.q = this.value; paintConcepts(); });
+$$('#csort button').forEach(function (b) {
+  b.onclick = function () {
+    CS.sort = b.dataset.s;
+    $$('#csort button').forEach(function (x) { x.classList.toggle('on', x === b); });
+    paintConcepts();
+  };
+});
 $('#bw').onclick = function () { startSession(shuffle(wrongList()), '오답'); };
 $('#bc').onclick = function () { startSession(unseen(), '이어서'); };
 /* ---------- 랜덤 설정 ---------- */

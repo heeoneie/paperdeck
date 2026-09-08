@@ -140,3 +140,39 @@ td input.ipt{width:100%;min-width:56px}
 .chk{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);cursor:pointer}
 .chk input{width:18px;height:18px;accent-color:var(--ac)}
 #rgo:disabled{opacity:.45;cursor:default}
+
+/* ---------- 탭 ---------- */
+.tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);
+ border-radius:10px;padding:4px;margin:18px 0 6px}
+.tabs button{flex:1;border:0;background:none;color:var(--dim);font:600 14px inherit;
+ padding:9px;border-radius:7px;cursor:pointer}
+.tabs button.on{background:var(--ac);color:#fff}
+
+/* ---------- 개념 목록 ---------- */
+.search{width:100%;box-sizing:border-box;font:inherit;font-size:16px;padding:11px 13px;
+ border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);
+ margin-bottom:10px}
+.search:focus{outline:2px solid var(--ac);outline-offset:-1px}
+.sortrow{margin-bottom:12px}
+.clist{background:var(--card);border-radius:12px;overflow:hidden}
+.crow{display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid var(--line);
+ cursor:pointer;color:var(--ink)}
+.crow:last-child{border-bottom:0}
+.crow:active{background:var(--bg)}
+.cname{flex:1;min-width:0;font-weight:600;font-size:15px;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmeta{flex:none;font-size:12px;color:var(--dim);text-align:right;line-height:1.4}
+.cmeta b{display:block;color:var(--ac);font-size:13px}
+.cempty{padding:26px;text-align:center;color:var(--dim);font-size:14px}
+
+/* ---------- 개념 상세 ---------- */
+.chead{margin:18px 0 6px}
+.chead h1{margin:0 0 2px}
+.cyear{display:flex;align-items:center;gap:8px;margin:22px 0 8px}
+.cyear b{font-size:14px;color:var(--ac);font-weight:700;flex:none}
+.cyear i{flex:1;height:1px;background:var(--line)}
+.cyear span{flex:none;font-size:11px;color:var(--dim)}
+.citem{background:var(--card);border-radius:12px;padding:15px;margin-bottom:10px}
+.sol-in{color:var(--ac);font-weight:700;background:var(--grbg);border-radius:4px;padding:1px 6px}
+.citem .ans .sol-in{background:none;padding:0}
+.citem img{max-width:100%;height:auto;display:block;margin:8px auto;border-radius:4px}

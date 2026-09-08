@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex,nofollow">
 <meta name="description" content="문제집을 카드로 바꿔 풀고 채점하는 학습 도구">
 <title>paperdeck</title>
-<link rel="stylesheet" href="app.css?v=9e24b52d1a">
+<link rel="stylesheet" href="app.css?v=c45a0a2c84">
 </head><body>
 
 <div class="top" id="top" style="display:none">
@@ -36,6 +36,10 @@
 </div></div>
 
 <div class="scr" id="scr-home"><div class="wrap">
+  <div class="tabs">
+    <button data-go="home">문제 풀기</button>
+    <button data-go="concepts">개념 보기</button>
+  </div>
   <h1 id="htitle"></h1>
   <div class="sub1" id="hsub"></div>
   <div class="stat"><div id="s1"></div><div id="s2"></div><div id="s3"></div></div>
@@ -67,6 +71,31 @@
   </div>
 </div></div>
 
+<div class="scr" id="scr-concepts"><div class="wrap">
+  <div class="tabs">
+    <button data-go="home">문제 풀기</button>
+    <button data-go="concepts">개념 보기</button>
+  </div>
+  <h1>개념 보기</h1>
+  <div class="sub1" id="csub"></div>
+  <input class="search" id="csearch" type="search" placeholder="개념 이름으로 찾기"
+         autocomplete="off" autocapitalize="off" spellcheck="false">
+  <div class="sortrow">
+    <div class="chips" id="csort">
+      <button data-s="n" class="on">많이 나온 순</button>
+      <button data-s="y">최근 출제순</button>
+      <button data-s="a">가나다순</button>
+    </div>
+  </div>
+  <div class="clist" id="clist"></div>
+  <div style="height:30px"></div>
+</div></div>
+
+<div class="scr" id="scr-concept"><div class="wrap">
+  <div class="cdetail" id="cdetail"></div>
+  <div style="height:30px"></div>
+</div></div>
+
 <div class="scr" id="scr-study"><div class="wrap"><div class="q" id="q"></div></div></div>
 
 <div class="scr" id="scr-done"><div class="wrap">
@@ -86,5 +115,5 @@
   </div>
 </div>
 
-<script src="app.js?v=9a0f6b1f8b"></script>
+<script src="app.js?v=ddcd19d414"></script>
 </body></html>
