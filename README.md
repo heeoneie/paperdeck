@@ -100,6 +100,12 @@ vercel alias  set  <deployment> paperdeck-app.vercel.app    # 로그인 벽에 �
 - `paperdeck.vercel.app` 은 **다른 사람의 서비스**입니다 (`/d/default` 로 리다이렉트).
 - `paperdeck-kohl.vercel.app` 은 최초 자동 배정 도메인으로 아직 살아 있습니다.
 
+## 랜덤 문제
+
+홈의 **랜덤 문제**를 누르면 연도 범위(시작~끝)와 문항 수(10/20/30/50/전체),
+`안 푼 문제만` 을 고를 수 있습니다. 고른 값은 `localStorage['pd_rnd']` 에 남아
+다음에도 그대로 뜹니다. 후보보다 문항 수가 크면 후보 수만큼만 출제합니다.
+
 ## 진도 저장
 
 문제를 **채점하는 즉시** `localStorage['pd_prog']` 에 기록됩니다.

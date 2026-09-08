@@ -352,6 +352,7 @@ function home() {
          '</span><span class="pb"><i style="width:' + (d / list.length * 100) + '%"></i></span></button>';
   });
   $('#yr').innerHTML = g;
+  paintRnd();
   $$('#yr button').forEach(function (b) {
     b.onclick = function () {
       var y = b.dataset.y;
@@ -367,7 +368,71 @@ $('#skip').onclick = function () { gradeNow(); };
 $('#back').onclick = function () { if (confirm('풀이를 그만두고 홈으로 갈까요?')) home(); };
 $('#bw').onclick = function () { startSession(shuffle(wrongList()), '오답'); };
 $('#bc').onclick = function () { startSession(unseen(), '이어서'); };
-$('#br').onclick = function () { startSession(shuffle(IT).slice(0, 20), '랜덤 20'); };
+/* ---------- 랜덤 설정 ---------- */
+var RK = 'pd_rnd';
+var rnd = { y1: null, y2: null, n: 20, only: false };
+try { Object.assign(rnd, JSON.parse(localStorage.getItem(RK) || '{}')); } catch (e) {}
+var COUNTS = [10, 20, 30, 50, 0];   /* 0 = 전체 */
+
+function rndYears() {
+  return DATA.years.map(function (y) { return y.y; }).sort();   /* '01' … '26' */
+}
+function rndPool() {
+  var ys = rndYears();
+  var a = rnd.y1 || ys[0], b = rnd.y2 || ys[ys.length - 1];
+  if (a > b) { var t = a; a = b; b = t; }
+  return IT.filter(function (it) {
+    if (!it.y.some(function (y) { return y >= a && y <= b; })) return false;
+    if (rnd.only && prog[key(it)]) return false;
+    return true;
+  });
+}
+function rndSave() { try { localStorage.setItem(RK, JSON.stringify(rnd)); } catch (e) {} }
+
+function paintRnd() {
+  var ys = rndYears().slice().reverse();
+  if (!rnd.y1) rnd.y1 = ys[ys.length - 1];
+  if (!rnd.y2) rnd.y2 = ys[0];
+  ['#ry1', '#ry2'].forEach(function (sel, i) {
+    var el = $(sel), cur = i ? rnd.y2 : rnd.y1;
+    el.innerHTML = ys.map(function (y) {
+      return '<option value="' + y + '"' + (y === cur ? ' selected' : '') + '>20' + y + '</option>';
+    }).join('');
+  });
+  $('#rn').innerHTML = COUNTS.map(function (c) {
+    return '<button data-n="' + c + '"' + (c === rnd.n ? ' class="on"' : '') + '>' +
+           (c ? c : '전체') + '</button>';
+  }).join('');
+  $$('#rn button').forEach(function (b) {
+    b.onclick = function () { rnd.n = +b.dataset.n; rndSave(); paintRnd(); };
+  });
+  $('#ronly').checked = !!rnd.only;
+
+  var pool = rndPool();
+  var n = rnd.n ? Math.min(rnd.n, pool.length) : pool.length;
+  $('#rgo').textContent = pool.length ? n + '문제 시작' : '해당하는 문제가 없습니다';
+  $('#rgo').disabled = !pool.length;
+  var lo = rnd.y1 < rnd.y2 ? rnd.y1 : rnd.y2, hi = rnd.y1 < rnd.y2 ? rnd.y2 : rnd.y1;
+  $('#brsub').textContent = '20' + lo + '~20' + hi + ' · ' +
+    (rnd.n ? rnd.n + '문제' : '전체') + (rnd.only ? ' · 안 푼 것만' : '') +
+    ' · 후보 ' + pool.length + '개';
+}
+
+$('#br').onclick = function () {
+  var el = $('#rnd');
+  el.hidden = !el.hidden;
+  if (!el.hidden) paintRnd();
+};
+$('#ry1').onchange = function () { rnd.y1 = this.value; rndSave(); paintRnd(); };
+$('#ry2').onchange = function () { rnd.y2 = this.value; rndSave(); paintRnd(); };
+$('#ronly').onchange = function () { rnd.only = this.checked; rndSave(); paintRnd(); };
+$('#rgo').onclick = function () {
+  var pool = shuffle(rndPool());
+  if (!pool.length) return;
+  if (rnd.n) pool = pool.slice(0, rnd.n);
+  var lo = rnd.y1 < rnd.y2 ? rnd.y1 : rnd.y2, hi = rnd.y1 < rnd.y2 ? rnd.y2 : rnd.y1;
+  startSession(pool, '랜덤 20' + lo + '~20' + hi);
+};
 $('#again').onclick = function () { var w = wrongList(); w.length ? startSession(shuffle(w), '오답') : home(); };
 $('#tohome').onclick = home;
 $('#reset').onclick = function () {

@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex,nofollow">
 <meta name="description" content="문제집을 카드로 바꿔 풀고 채점하는 학습 도구">
 <title>paperdeck</title>
-<link rel="stylesheet" href="app.css?v=5ae9841fc1">
+<link rel="stylesheet" href="app.css?v=9e24b52d1a">
 </head><body>
 
 <div class="top" id="top" style="display:none">
@@ -41,7 +41,19 @@
   <div class="stat"><div id="s1"></div><div id="s2"></div><div id="s3"></div></div>
   <button class="btn pri" id="bc"></button>
   <button class="btn" id="bw"></button>
-  <button class="btn" id="br">랜덤 20문제<small>연도 섞어서</small></button>
+  <button class="btn" id="br">랜덤 문제<small id="brsub">연도 범위와 문항 수를 고릅니다</small></button>
+  <div class="panel" id="rnd" hidden>
+    <div class="prow">
+      <label>연도</label>
+      <div class="pctl"><select id="ry1"></select><span class="tilde">~</span><select id="ry2"></select></div>
+    </div>
+    <div class="prow">
+      <label>문항 수</label>
+      <div class="chips" id="rn"></div>
+    </div>
+    <label class="chk"><input type="checkbox" id="ronly"> 안 푼 문제만</label>
+    <button class="btn pri" id="rgo" style="margin:12px 0 0">시작</button>
+  </div>
   <div class="sec">연도별</div>
   <div class="yr" id="yr"></div>
   <div class="sec">기타</div>
@@ -74,5 +86,5 @@
   </div>
 </div>
 
-<script src="app.js?v=52e622c5a1"></script>
+<script src="app.js?v=9a0f6b1f8b"></script>
 </body></html>

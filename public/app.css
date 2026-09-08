@@ -123,3 +123,20 @@ td input.ipt{width:100%;min-width:56px}
  color:var(--dim);line-height:1.8;margin-bottom:26px}
 .hint b{color:var(--ink)}
 .hint code{background:var(--bg);border-radius:4px;padding:1px 5px;font-size:12px}
+
+/* ---------- 랜덤 설정 패널 ---------- */
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;
+ padding:14px;margin:-4px 0 10px}
+.prow{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.prow>label{font-size:13px;color:var(--dim);font-weight:600;flex:none;width:52px}
+.pctl{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
+.panel select{flex:1;min-width:0;font:inherit;font-size:15px;padding:8px 10px;
+ border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.tilde{color:var(--dim);flex:none}
+.chips{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+.chips button{font:600 14px inherit;padding:7px 13px;border-radius:8px;cursor:pointer;
+ border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.chips button.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.chk{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);cursor:pointer}
+.chk input{width:18px;height:18px;accent-color:var(--ac)}
+#rgo:disabled{opacity:.45;cursor:default}
