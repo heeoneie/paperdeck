@@ -159,8 +159,41 @@ function renderSolved(it) {
   });
 }
 
-/* ---------- 개념 ---------- */
-var CS = { sort: 'n', q: '' };
+/* ---------- 기출 보기 ---------- */
+var CS = { mode: 'y', sort: 'n', q: '' };
+try { CS.mode = localStorage.getItem('pd_bmode') || 'y'; } catch (e) {}
+
+function rnum(r) { var m = /(\d+)\s*회/.exec(r); return m ? +m[1] : 0; }
+function ryear(r) { var m = /(\d{4})/.exec(r); return m ? m[1].slice(2) : ''; }
+
+/* 연도 → 회차 → 문제. 한 문제가 여러 회차에 나왔으면 각 회차에 모두 들어간다.
+   회차 안의 순서는 책에 실린 순서(페이지 → 등장 순)를 그대로 따른다. */
+function years() {
+  var g = {};
+  IT.forEach(function (it) {
+    it.r.forEach(function (r) {
+      var y = ryear(r);
+      if (!y) return;
+      g[y] = g[y] || {};
+      (g[y][r] = g[y][r] || []).push(it);
+    });
+  });
+  return Object.keys(g).sort().reverse().map(function (y) {
+    var rounds = Object.keys(g[y]).sort(function (a, b) { return rnum(b) - rnum(a); })
+      .map(function (r) {
+        var list = g[y][r].slice().sort(function (a, b) {
+          return (a.p - b.p) || ((a.i || 0) - (b.i || 0));
+        });
+        return { r: r, list: list };
+      });
+    var n = rounds.reduce(function (s, o) { return s + o.list.length; }, 0);
+    var seen = [];
+    rounds.forEach(function (o) {
+      o.list.forEach(function (it) { if (seen.indexOf(it) < 0) seen.push(it); });
+    });
+    return { y: y, rounds: rounds, n: n, u: seen.length };
+  });
+}
 
 function concepts() {
   var g = {};
@@ -171,6 +204,33 @@ function concepts() {
     list.forEach(function (it) { ys = ys.concat(it.y); });
     ys = ys.filter(function (v, i) { return ys.indexOf(v) === i; }).sort();
     return { t: t, list: list, n: list.length, lo: ys[0], hi: ys[ys.length - 1] };
+  });
+}
+
+function paintBrowse() {
+  var byYear = CS.mode === 'y';
+  $$('#cmode button').forEach(function (b) { b.classList.toggle('on', b.dataset.m === CS.mode); });
+  $('#csearch').style.display = byYear ? 'none' : '';
+  $('#csortrow').style.display = byYear ? 'none' : '';
+  if (byYear) paintYears(); else paintConcepts();
+}
+
+function paintYears() {
+  var all = years();
+  var nr = all.reduce(function (s, o) { return s + o.rounds.length; }, 0);
+  var slots = all.reduce(function (s, o) { return s + o.n; }, 0);
+  $('#csub').textContent = '연도 ' + all.length + '개 · 회차 ' + nr + '개 · 문제 ' +
+    IT.length + '개' +
+    (slots !== IT.length ? ' (여러 회차에 나온 것까지 세면 ' + slots + '개)' : '') +
+    ' · 나온 순서 그대로, 답이 다 보입니다';
+  $('#clist').innerHTML = all.map(function (o) {
+    var rs = o.rounds.map(function (x) { return rnum(x.r) + '회'; }).join(' · ');
+    return '<div class="crow" data-y="' + o.y + '">' +
+           '<span class="cname">20' + o.y + '년</span>' +
+           '<span class="cmeta"><b>' + o.n + '문제</b>' + rs + '</span></div>';
+  }).join('');
+  $$('#clist .crow').forEach(function (r) {
+    r.onclick = function () { openYear(r.dataset.y); };
   });
 }
 
@@ -196,6 +256,48 @@ function paintConcepts() {
   $$('#clist .crow').forEach(function (r) {
     r.onclick = function () { openConcept(r.dataset.t); };
   });
+}
+
+/* 한 해에 나온 문제를 회차별로, 실린 순서 그대로 */
+function openYear(y) {
+  var o = years().filter(function (x) { return x.y === y; })[0];
+  if (!o) return;
+  var h = ['<div class="chead"><h1>20' + y + '년 기출</h1>' +
+           '<div class="sub1">' + o.n + '문제' +
+           (o.u !== o.n ? ' (서로 다른 문제 ' + o.u + '개)' : '') +
+           ' · 나온 순서 그대로 · 답이 다 보입니다</div></div>'];
+
+  /* 그 해에 나온 개념을 한눈에 — 누르면 그 문제로 간다 */
+  h.push('<div class="cidx">' + o.rounds.map(function (rd, ri) {
+    return '<div class="cidxr"><b>' + rnum(rd.r) + '회</b><span>' +
+      rd.list.map(function (it, i) {
+        return '<a href="#" data-jump="q' + ri + '_' + i + '">' + esc(it.t) + '</a>';
+      }).join('') + '</span></div>';
+  }).join('') + '</div>');
+
+  o.rounds.forEach(function (rd, ri) {
+    h.push('<div class="cyear"><b>' + esc(rd.r) + '</b><i></i>' +
+           '<span>' + rd.list.length + '문제</span></div>');
+    rd.list.forEach(function (it, i) {
+      var other = it.r.filter(function (r) { return r !== rd.r; });
+      h.push('<div class="citem" id="q' + ri + '_' + i + '"><div class="cnum">' + (i + 1) + '</div>' +
+             renderSolved(it) +
+             (other.length ? '<div class="note" style="margin:10px 0 0">같은 문제: ' +
+               esc(other.join(' · ')) + '</div>' : '') + '</div>');
+    });
+  });
+  $('#cdetail').innerHTML = h.join('');
+  $$('#cdetail [data-jump]').forEach(function (a) {
+    a.onclick = function (ev) {
+      ev.preventDefault();
+      var el = document.getElementById(a.dataset.jump);
+      if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.pageYOffset - 56);
+    };
+  });
+  $('#tt').textContent = '20' + y + '년';
+  $('#ts').textContent = o.n + '문제 · ' + o.rounds.length + '개 회차';
+  $('#pbar').style.width = '100%';
+  show('concept');
 }
 
 function openConcept(title) {
@@ -451,7 +553,14 @@ $('#back').onclick = function () {
 $$('.tabs button').forEach(function (b) {
   b.onclick = function () {
     if (b.dataset.go === 'home') home();
-    else { paintConcepts(); show('concepts'); }
+    else { paintBrowse(); show('concepts'); }
+  };
+});
+$$('#cmode button').forEach(function (b) {
+  b.onclick = function () {
+    CS.mode = b.dataset.m;
+    try { localStorage.setItem('pd_bmode', CS.mode); } catch (e) {}
+    paintBrowse();
   };
 });
 $('#csearch').addEventListener('input', function () { CS.q = this.value; paintConcepts(); });
