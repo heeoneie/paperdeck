@@ -569,8 +569,14 @@ window.addEventListener('popstate', function (e) {
     return;
   }
   progGo = false;
-  if (!DATA) show('load', true);
-  else if (st.s === 'home') home(true);
+  if (!DATA) { show('load', true); return; }
+  /* 새로고침 뒤에는 메모리 상태가 비어 있다 — 내용이 없는 화면은 홈으로 */
+  var ready = { study: S.list.length, done: S.list.length, concept: $('#cdetail').innerHTML };
+  if (st.s in ready && !ready[st.s]) {
+    try { history.replaceState({ s: 'home', d: 0 }, ''); } catch (e) {}
+    home(true);
+  } else if (st.s === 'home') home(true);
+  else if (st.s === 'concepts') { paintBrowse(); show('concepts', true); }
   else show(st.s, true);
 });
 $$('.tabs button[data-go]').forEach(function (b) {
