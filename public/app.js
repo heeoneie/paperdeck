@@ -331,7 +331,19 @@ function startSession(list, label) {
   S = { list: list, pos: 0, graded: false, marks: {}, label: label };
   show('study'); paint();
 }
-function show(n) {
+/* ---------- 화면 히스토리: 폰의 뒤로가기가 사이트를 나가지 않고 이전 화면으로 ---------- */
+var DEPTH = { load: 0, home: 0, concepts: 1, study: 1, done: 1, concept: 2 };
+var progGo = false;   /* 코드가 history.go 를 부른 경우 — 풀이 중단 확인을 건너뛴다 */
+function navTo(n) {
+  var d = DEPTH[n], cur = history.state, d0 = cur && cur.d || 0;
+  try {
+    if (d > d0) history.pushState({ s: n, d: d }, '');
+    else if (d === d0) history.replaceState({ s: n, d: d }, '');
+    else { progGo = true; history.go(d - d0); }
+  } catch (e) {}
+}
+function show(n, pop) {
+  if (!pop) navTo(n);
   $$('.scr').forEach(function (e) { e.classList.toggle('on', e.id === 'scr-' + n); });
   /* 상단바가 필요 없는 화면 */
   var bare = (n === 'home' || n === 'load' || n === 'concepts');
@@ -510,7 +522,7 @@ function shuffle(a) {
   for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
   return a;
 }
-function home() {
+function home(pop) {
   $('#htitle').textContent = (DATA.title || '문제집');
   $('#hsub').textContent = (DATA.subtitle || '') +
       ' · 문제 ' + IT.length + '개 · 답을 적으면 채점해 드립니다';
@@ -540,16 +552,27 @@ function home() {
       startSession(IT.filter(function (it) { return it.y.indexOf(y) >= 0; }), '20' + y);
     };
   });
-  show('home');
+  show('home', pop);
 }
 
 /* ---------- 배선 ---------- */
 $('#act').onclick = doAct;
 $('#skip').onclick = function () { gradeNow(); };
 $('#back').onclick = function () {
-  if ($('#scr-concept').classList.contains('on')) { show('concepts'); return; }
-  if (confirm('풀이를 그만두고 홈으로 갈까요?')) home();
+  if (history.state && history.state.d > 0) history.back(); else home();
 };
+window.addEventListener('popstate', function (e) {
+  var st = e.state || { s: DATA ? 'home' : 'load', d: 0 };
+  var studying = $('#scr-study').classList.contains('on');
+  if (studying && st.s !== 'study' && !progGo && !confirm('풀이를 그만두고 홈으로 갈까요?')) {
+    history.pushState({ s: 'study', d: 1 }, '');
+    return;
+  }
+  progGo = false;
+  if (!DATA) show('load', true);
+  else if (st.s === 'home') home(true);
+  else show(st.s, true);
+});
 $$('.tabs button[data-go]').forEach(function (b) {
   b.onclick = function () {
     if (b.dataset.go === 'home') home();
@@ -639,7 +662,7 @@ $('#rgo').onclick = function () {
   startSession(pool, '랜덤 20' + lo + '~20' + hi);
 };
 $('#again').onclick = function () { var w = wrongList(); w.length ? startSession(shuffle(w), '오답') : home(); };
-$('#tohome').onclick = home;
+$('#tohome').onclick = function () { home(); };
 $('#reset').onclick = function () {
   if (confirm('진도 기록을 모두 지웁니다. 계속할까요?')) { prog = {}; save(); home(); }
 };
@@ -776,4 +799,5 @@ $$('.thm').forEach(function (b) {
 });
 paintTheme();
 
+try { history.replaceState({ s: 'home', d: 0 }, ''); } catch (e) {}
 boot();
