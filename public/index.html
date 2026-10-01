@@ -7,7 +7,8 @@
 <meta name="robots" content="noindex,nofollow">
 <meta name="description" content="문제집을 카드로 바꿔 풀고 채점하는 학습 도구">
 <title>paperdeck</title>
-<link rel="stylesheet" href="app.css?v=8d2f2da3b9">
+<script>try{var t=localStorage.getItem('pd_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-t',t)}catch(e){}</script>
+<link rel="stylesheet" href="app.css?v=8f6ecd28ff">
 </head><body>
 
 <div class="top" id="top" style="display:none">
@@ -41,6 +42,7 @@
   <div class="tabs">
     <button data-go="home">문제 풀기</button>
     <button data-go="concepts">기출 보기</button>
+    <button class="thm" type="button"></button>
   </div>
   <h1 id="htitle"></h1>
   <div class="sub1" id="hsub"></div>
@@ -77,6 +79,7 @@
   <div class="tabs">
     <button data-go="home">문제 풀기</button>
     <button data-go="concepts">기출 보기</button>
+    <button class="thm" type="button"></button>
   </div>
   <h1>기출 보기</h1>
   <div class="sub1" id="csub"></div>
@@ -123,5 +126,5 @@
   </div>
 </div>
 
-<script src="app.js?v=e0609bb189"></script>
+<script src="app.js?v=61628cc70e"></script>
 </body></html>

@@ -342,7 +342,7 @@ function show(n) {
     $('#ts').textContent = S.label + ' · ' + S.list.length + '문제';
     $('#pbar').style.width = '100%';
   }
-  $$('.tabs button').forEach(function (b) {
+  $$('.tabs button[data-go]').forEach(function (b) {
     b.classList.toggle('on', b.dataset.go === (n === 'concept' ? 'concepts' : n));
   });
   window.scrollTo(0, 0);
@@ -550,7 +550,7 @@ $('#back').onclick = function () {
   if ($('#scr-concept').classList.contains('on')) { show('concepts'); return; }
   if (confirm('풀이를 그만두고 홈으로 갈까요?')) home();
 };
-$$('.tabs button').forEach(function (b) {
+$$('.tabs button[data-go]').forEach(function (b) {
   b.onclick = function () {
     if (b.dataset.go === 'home') home();
     else { paintBrowse(); show('concepts'); }
@@ -745,5 +745,35 @@ document.addEventListener('visibilitychange', function () {
   if (document.visibilityState === 'hidden') save();
 });
 window.addEventListener('pagehide', save);
+
+/* ---------- 테마: 자동(시스템) → 라이트 → 다크 ---------- */
+var THEMES = ['auto', 'light', 'dark'];
+var THEME_LABEL = { auto: '◐ 자동', light: '☀ 라이트', dark: '☾ 다크' };
+var themeNow = 'auto';
+try { themeNow = localStorage.getItem('pd_theme') || 'auto'; } catch (e) {}
+if (THEMES.indexOf(themeNow) < 0) themeNow = 'auto';
+function paintTheme() {
+  var root = document.documentElement;
+  if (themeNow === 'auto') root.removeAttribute('data-t'); else root.setAttribute('data-t', themeNow);
+  var dark = themeNow === 'dark' || (themeNow === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  $$('meta[name="theme-color"]').forEach(function (m) {
+    if (!m.dataset.c) m.dataset.c = m.content;
+    m.content = themeNow === 'auto' ? m.dataset.c : (dark ? '#232629' : '#ffffff');
+  });
+  $$('.thm').forEach(function (b) {
+    b.textContent = THEME_LABEL[themeNow];
+    b.setAttribute('aria-label', '화면 테마: ' + THEME_LABEL[themeNow].slice(2));
+  });
+}
+$$('.thm').forEach(function (b) {
+  b.onclick = function () {
+    themeNow = THEMES[(THEMES.indexOf(themeNow) + 1) % THEMES.length];
+    try {
+      if (themeNow === 'auto') localStorage.removeItem('pd_theme'); else localStorage.setItem('pd_theme', themeNow);
+    } catch (e) {}
+    paintTheme();
+  };
+});
+paintTheme();
 
 boot();

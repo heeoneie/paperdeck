@@ -11,6 +11,12 @@
   --gr:#3fcf94; --rd:#ff7b72; --am:#e3b341;
   color-scheme:dark;
 }}
+:root[data-t="dark"]{
+  --bg:#181b1e; --card:#232629; --ink:#e8ecef; --dim:#9aa5af; --line:#363b40;
+  --grbg:#14352a; --rdbg:#3a1f1e; --ambg:#3a3320;
+  --gr:#3fcf94; --rd:#ff7b72; --am:#e3b341;
+  color-scheme:dark;
+}
 html,body{margin:0;padding:0}
 body{background:var(--bg);color:var(--ink);line-height:1.6;
  font-family:'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
@@ -150,6 +156,7 @@ td input.ipt{width:100%;min-width:56px}
 .tabs button{flex:1;border:0;background:none;color:var(--dim);font:600 14px inherit;
  padding:9px;border-radius:7px;cursor:pointer}
 .tabs button.on{background:var(--ac);color:#fff}
+.tabs button.thm{flex:none;font-weight:600;font-size:13px;padding:9px 12px;white-space:nowrap}
 
 /* ---------- 기출/개념 목록 ---------- */
 .moderow{margin:0 0 12px}
