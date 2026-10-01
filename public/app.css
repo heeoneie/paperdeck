@@ -3,10 +3,13 @@
   --bg:#eef1f4; --card:#fff; --ink:#1b2430; --dim:#6b7885; --line:#e3e8ed;
   --gr:#0a8f5a; --grbg:#e6f5ee; --rd:#d0342c; --rdbg:#fdeceb;
   --am:#b57b0a; --ambg:#fdf6e6; --ac:#2f7d5f;
+  color-scheme:light;
 }
 @media (prefers-color-scheme:dark){:root:not([data-t="light"]){
   --bg:#181b1e; --card:#232629; --ink:#e8ecef; --dim:#9aa5af; --line:#363b40;
   --grbg:#14352a; --rdbg:#3a1f1e; --ambg:#3a3320;
+  --gr:#3fcf94; --rd:#ff7b72; --am:#e3b341; --ac:#3fa57f;
+  color-scheme:dark;
 }}
 html,body{margin:0;padding:0}
 body{background:var(--bg);color:var(--ink);line-height:1.6;
