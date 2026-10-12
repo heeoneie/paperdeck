@@ -221,6 +221,11 @@ function freqs() {
   });
 }
 
+/* 전체를 빈출순으로 한 줄로 */
+function byFreq() {
+  return freqs().reduce(function (a, o) { return a.concat(o.list); }, []);
+}
+
 function paintBrowse() {
   var byConcept = CS.mode === 'c';
   $$('#cmode button').forEach(function (b) { b.classList.toggle('on', b.dataset.m === CS.mode); });
@@ -340,7 +345,9 @@ function openFreq(k) {
   var o = freqs().filter(function (x) { return x.k === k; })[0];
   if (!o) return;
   var h = ['<div class="chead"><h1>' + k + '회 출제된 문제</h1>' +
-           '<div class="sub1">' + o.list.length + '문제 · 최근 출제순 · 답이 다 보입니다</div></div>'];
+           '<div class="sub1">' + o.list.length + '문제 · 최근 출제순 · 답이 다 보입니다</div></div>',
+           '<button class="btn pri" id="fgo">이 ' + o.list.length + '문제 풀기' +
+           '<small>답을 가리고 채점합니다</small></button>'];
 
   /* 한 번만 나온 문제는 수가 많아 목차를 생략한다 */
   if (k > 1) {
@@ -360,6 +367,7 @@ function openFreq(k) {
   });
   $('#cdetail').innerHTML = h.join('');
   wireJumps();
+  $('#fgo').onclick = function () { startSession(o.list, k + '회 출제'); };
   $('#tt').textContent = k + '회 출제';
   $('#ts').textContent = '빈출순 · ' + o.list.length + '문제';
   $('#pbar').style.width = '100%';
@@ -400,12 +408,13 @@ function startSession(list, label) {
 /* ---------- 화면 히스토리: 폰의 뒤로가기가 사이트를 나가지 않고 이전 화면으로 ---------- */
 var DEPTH = { load: 0, home: 0, concepts: 1, study: 1, done: 1, concept: 2 };
 var progGo = false;   /* 코드가 history.go 를 부른 경우 — 풀이 중단 확인을 건너뛴다 */
+var goTo = null;      /* 그때 실제로 띄운 화면. 돌아간 히스토리 칸에 이 화면을 적는다 */
 function navTo(n) {
   var d = DEPTH[n], cur = history.state, d0 = cur && cur.d || 0;
   try {
     if (d > d0) history.pushState({ s: n, d: d }, '');
     else if (d === d0) history.replaceState({ s: n, d: d }, '');
-    else { progGo = true; history.go(d - d0); }
+    else { progGo = true; goTo = { s: n, d: d }; history.go(d - d0); }
   } catch (e) {}
 }
 function show(n, pop) {
@@ -603,6 +612,8 @@ function home(pop) {
   $('#bw').disabled = !w.length;
   $('#bc').innerHTML = '이어서 풀기<small>' + (u.length ? '안 푼 ' + u.length + '문제' : '전부 풀었습니다') + '</small>';
   $('#bc').disabled = !u.length;
+  $('#bf').innerHTML = '빈출순으로 풀기<small>많이 나온 문제부터 · ' +
+    (u.length ? '안 푼 ' + u.length + '문제' : '전부 풀어서 처음부터 ' + IT.length + '문제') + '</small>';
   var g = '';
   DATA.years.forEach(function (y) {
     var list = IT.filter(function (it) { return it.y.indexOf(y.y) >= 0; });
@@ -629,6 +640,13 @@ $('#back').onclick = function () {
 };
 window.addEventListener('popstate', function (e) {
   var st = e.state || { s: DATA ? 'home' : 'load', d: 0 };
+  /* 코드가 부른 이동 — 화면은 이미 show() 가 그렸다. 도착한 칸이 예전 화면
+     (예: 기출 묶음 → 풀기일 때의 '기출 보기')이면 그걸 다시 그리지 않고 칸만 고친다. */
+  if (progGo && goTo) {
+    try { history.replaceState(goTo, ''); } catch (e2) {}
+    progGo = false; goTo = null;
+    return;
+  }
   var studying = $('#scr-study').classList.contains('on');
   if (studying && st.s !== 'study' && !progGo && !confirm('풀이를 그만두고 홈으로 갈까요?')) {
     history.pushState({ s: 'study', d: 1 }, '');
@@ -668,6 +686,11 @@ $$('#csort button').forEach(function (b) {
 });
 $('#bw').onclick = function () { startSession(shuffle(wrongList()), '오답'); };
 $('#bc').onclick = function () { startSession(unseen(), '이어서'); };
+/* 안 푼 문제를 많이 나온 것부터. 다 풀었으면 전체를 처음부터. */
+$('#bf').onclick = function () {
+  var all = byFreq(), left = all.filter(function (it) { return !prog[key(it)]; });
+  startSession(left.length ? left : all, '빈출순');
+};
 /* ---------- 랜덤 설정 ---------- */
 var RK = 'pd_rnd';
 var rnd = { y1: null, y2: null, n: 20, only: false };

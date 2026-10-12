@@ -190,6 +190,7 @@ td input.ipt{width:100%;min-width:56px}
 /* ---------- 개념 상세 ---------- */
 .chead{margin:18px 0 6px}
 .chead h1{margin:0 0 2px}
+#fgo{margin:12px 0 0}
 .cyear{display:flex;align-items:center;gap:8px;margin:22px 0 8px}
 .cyear b{font-size:14px;color:var(--ac);font-weight:700;flex:none}
 .cyear i{flex:1;height:1px;background:var(--line)}
