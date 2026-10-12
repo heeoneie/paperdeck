@@ -345,7 +345,9 @@ function openFreq(k) {
   /* 한 번만 나온 문제는 수가 많아 목차를 생략한다 */
   if (k > 1) {
     h.push('<div class="cidx"><div class="cidxr"><span>' + o.list.map(function (it, i) {
-      return '<a href="#" data-jump="f' + i + '">' + esc(it.t) + '</a>';
+      var r = latest(it);
+      return '<a href="#" data-jump="f' + i + '">' + esc(it.t) +
+             '<i>' + ryear(r) + '년 ' + rnum(r) + '회</i></a>';
     }).join('') + '</span></div></div>');
   }
   o.list.forEach(function (it, i) {
