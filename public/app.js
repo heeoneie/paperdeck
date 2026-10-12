@@ -207,12 +207,43 @@ function concepts() {
   });
 }
 
+/* 같은 문제가 몇 번 출제됐는지(회차 수)로 묶는다. 많이 나온 묶음이 앞으로,
+   묶음 안에서는 최근에 나온 문제가 앞으로. */
+function latest(it) { return it.r.slice().sort().reverse()[0] || ''; }
+function freqs() {
+  var g = {};
+  IT.forEach(function (it) { (g[it.r.length] = g[it.r.length] || []).push(it); });
+  return Object.keys(g).map(Number).sort(function (a, b) { return b - a; }).map(function (k) {
+    var list = g[k].slice().sort(function (a, b) {
+      return latest(b).localeCompare(latest(a)) || (a.p - b.p);
+    });
+    return { k: k, list: list };
+  });
+}
+
 function paintBrowse() {
-  var byYear = CS.mode === 'y';
+  var byConcept = CS.mode === 'c';
   $$('#cmode button').forEach(function (b) { b.classList.toggle('on', b.dataset.m === CS.mode); });
-  $('#csearch').style.display = byYear ? 'none' : '';
-  $('#csortrow').style.display = byYear ? 'none' : '';
-  if (byYear) paintYears(); else paintConcepts();
+  $('#csearch').style.display = byConcept ? '' : 'none';
+  $('#csortrow').style.display = byConcept ? '' : 'none';
+  if (CS.mode === 'y') paintYears(); else if (CS.mode === 'f') paintFreqs(); else paintConcepts();
+}
+
+function paintFreqs() {
+  var all = freqs();
+  var rep = IT.filter(function (it) { return it.r.length > 1; }).length;
+  $('#csub').textContent = '문제 ' + IT.length + '개 · 두 번 이상 나온 문제 ' + rep +
+                           '개 · 같은 문제가 출제된 횟수 기준, 답이 다 보입니다';
+  $('#clist').innerHTML = all.map(function (o) {
+    var ys = o.list.map(function (it) { return ryear(latest(it)); }).sort();
+    return '<div class="crow" data-k="' + o.k + '">' +
+           '<span class="cname">' + o.k + '회 출제</span>' +
+           '<span class="cmeta"><b>' + o.list.length + '문제</b>최근 20' +
+           ys[ys.length - 1] + '</span></div>';
+  }).join('');
+  $$('#clist .crow').forEach(function (r) {
+    r.onclick = function () { openFreq(+r.dataset.k); };
+  });
 }
 
 function paintYears() {
@@ -258,6 +289,16 @@ function paintConcepts() {
   });
 }
 
+function wireJumps() {
+  $$('#cdetail [data-jump]').forEach(function (a) {
+    a.onclick = function (ev) {
+      ev.preventDefault();
+      var el = document.getElementById(a.dataset.jump);
+      if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.pageYOffset - 56);
+    };
+  });
+}
+
 /* 한 해에 나온 문제를 회차별로, 실린 순서 그대로 */
 function openYear(y) {
   var o = years().filter(function (x) { return x.y === y; })[0];
@@ -287,15 +328,38 @@ function openYear(y) {
     });
   });
   $('#cdetail').innerHTML = h.join('');
-  $$('#cdetail [data-jump]').forEach(function (a) {
-    a.onclick = function (ev) {
-      ev.preventDefault();
-      var el = document.getElementById(a.dataset.jump);
-      if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.pageYOffset - 56);
-    };
-  });
+  wireJumps();
   $('#tt').textContent = '20' + y + '년';
   $('#ts').textContent = o.n + '문제 · ' + o.rounds.length + '개 회차';
+  $('#pbar').style.width = '100%';
+  show('concept');
+}
+
+/* k번 출제된 문제를 최근 출제순으로 */
+function openFreq(k) {
+  var o = freqs().filter(function (x) { return x.k === k; })[0];
+  if (!o) return;
+  var h = ['<div class="chead"><h1>' + k + '회 출제된 문제</h1>' +
+           '<div class="sub1">' + o.list.length + '문제 · 최근 출제순 · 답이 다 보입니다</div></div>'];
+
+  /* 한 번만 나온 문제는 수가 많아 목차를 생략한다 */
+  if (k > 1) {
+    h.push('<div class="cidx"><div class="cidxr"><span>' + o.list.map(function (it, i) {
+      return '<a href="#" data-jump="f' + i + '">' + esc(it.t) + '</a>';
+    }).join('') + '</span></div></div>');
+  }
+  o.list.forEach(function (it, i) {
+    h.push('<div class="cyear"><b>' + esc(latest(it)) + '</b><i></i>' +
+           (k > 1 ? '<span>' + k + '회 출제</span>' : '') + '</div>');
+    h.push('<div class="citem" id="f' + i + '"><div class="cnum">' + (i + 1) + '</div>' +
+           renderSolved(it) +
+           (k > 1 ? '<div class="note" style="margin:10px 0 0">출제: ' +
+             esc(it.r.join(' · ')) + '</div>' : '') + '</div>');
+  });
+  $('#cdetail').innerHTML = h.join('');
+  wireJumps();
+  $('#tt').textContent = k + '회 출제';
+  $('#ts').textContent = '빈출순 · ' + o.list.length + '문제';
   $('#pbar').style.width = '100%';
   show('concept');
 }
