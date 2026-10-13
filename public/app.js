@@ -782,9 +782,24 @@ function acceptFile(f) {
     if (!j || !Array.isArray(j.items) || !j.media) {
       st.textContent = 'paperdeck 데이터 형식이 아닙니다. (items / media 필드가 필요합니다)'; return;
     }
+    if (!j.items.length || !j.items.every(function (it) {
+      return it && Array.isArray(it.b) && Array.isArray(it.r) && Array.isArray(it.y);
+    })) {
+      st.textContent = 'paperdeck 데이터 형식이 아닙니다. (문제마다 b / r / y 필드가 필요합니다)'; return;
+    }
+    /* 연도 목록이 없는 파일은 문제에서 만들어 쓴다 */
+    if (!Array.isArray(j.years)) {
+      var yc = {};
+      j.items.forEach(function (it) { it.y.forEach(function (y) { yc[y] = (yc[y] || 0) + 1; }); });
+      j.years = Object.keys(yc).sort().reverse().map(function (y) { return { y: y, n: yc[y] }; });
+    }
+    /* 직접 불러온 문제집 — 동봉 데이터의 자동 갱신이 덮어쓰지 않게 표시해 둔다 */
+    j.local = 1;
     st.textContent = '저장 중…';
-    idbSet(DSK, j).then(function () { setData(j); loadProg(); home(); })
-      .catch(function (e) { st.textContent = '저장 실패: ' + e; });
+    idbSet(DSK, j).then(function () {
+      st.textContent = '';
+      setData(j); loadProg(); rnd.y1 = rnd.y2 = null; home();
+    }).catch(function (e) { st.textContent = '저장 실패: ' + e; });
   };
   fr.readAsText(f);
 }
@@ -796,7 +811,7 @@ var BUNDLED = 'data/ek.json';
 function boot() {
   loadProg();
   idbGet(DSK).then(function (d) {
-    if (d && d.items) { setData(d); home(); checkUpdate(d.v); return; }
+    if (d && d.items) { setData(d); home(); if (!d.local) checkUpdate(d.v); return; }
     return tryBundled();
   }).catch(function () { return tryBundled(); });
 }
@@ -811,6 +826,8 @@ function checkUpdate(have) {
     return fetch(BUNDLED, { cache: 'no-store' }).then(function (r) { return r.json(); })
       .then(function (j) {
         if (!j || !Array.isArray(j.items)) return;
+        /* 받는 사이에 다른 문제집을 불러왔으면 건드리지 않는다 */
+        if (DATA && DATA.local) return;
         return idbSet(DSK, j).then(function () {
           setData(j);
           if ($('#scr-home').classList.contains('on')) home();
@@ -842,7 +859,7 @@ function tryBundled() {
   });
 }
 
-$('#file').addEventListener('change', function () { acceptFile(this.files[0]); });
+$('#file').addEventListener('change', function () { acceptFile(this.files[0]); this.value = ''; });
 $('#drop').addEventListener('click', function () { $('#file').click(); });
 ['dragenter', 'dragover'].forEach(function (e) {
   $('#drop').addEventListener(e, function (ev) { ev.preventDefault(); this.classList.add('over'); });
@@ -853,9 +870,36 @@ $('#drop').addEventListener('click', function () { $('#file').click(); });
 $('#drop').addEventListener('drop', function (ev) {
   acceptFile(ev.dataTransfer.files && ev.dataTransfer.files[0]);
 });
+/* 지금 문제집은 새 파일을 다 읽을 때까지 그대로 둔다 — 고르다 말고 돌아갈 수 있게 */
 $('#swap').onclick = function () {
-  if (!confirm('다른 문제집 데이터로 바꿉니다. 진도 기록은 남아 있습니다.')) return;
-  idbDel(DSK).then(function () { DATA = null; IT = []; MED = {}; $('#lstat').textContent = ''; show('load'); });
+  $('#lstat').textContent = '';
+  $('#drop').style.display = '';
+  $('#lhint').style.display = '';
+  $('#lhint0').style.display = 'none';
+  $('#lback').style.display = '';
+  $('#ldef').style.display = DATA.local ? '' : 'none';
+  show('load', true);
+  try { history.pushState({ s: 'load', d: 1 }, ''); } catch (e) {}
+};
+$('#lback').onclick = function () {
+  if (history.state && history.state.d > 0) history.back(); else home();
+};
+$('#ldef').onclick = function () {
+  if (!confirm('직접 불러온 문제집을 지우고 기본 문제집을 다시 받습니다. 진도 기록은 남아 있습니다.')) return;
+  var st = $('#lstat');
+  st.textContent = '문제를 받는 중…';
+  fetch(BUNDLED, { cache: 'no-cache' }).then(function (r) {
+    if (!r.ok) throw 0;
+    return r.json();
+  }).then(function (j) {
+    if (!j || !Array.isArray(j.items)) throw 0;
+    return idbSet(DSK, j).then(function () {
+      st.textContent = '';
+      setData(j); rnd.y1 = rnd.y2 = null; home();
+    });
+  }).catch(function () {
+    st.textContent = '기본 문제집을 받지 못했습니다. 지금 문제집은 그대로입니다.';
+  });
 };
 
 /* 탭을 닫거나 백그라운드로 보낼 때 안전망 */
