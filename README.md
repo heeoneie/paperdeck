@@ -172,9 +172,8 @@ vercel --prod            # 로컬 파일이 그대로 올라감
 앱은 시작할 때 `data/ek.json` 을 먼저 찾고, 없으면 파일 불러오기 화면을 띄웁니다.
 
 > **주의** — GitHub 연동(자동 배포)은 저장소 내용만으로 배포하므로 `public/data/` 가
-> 빠집니다. 그래서 `vercel.json` 의 `git.deploymentEnabled` 로 `main` 자동 배포를 꺼 두었습니다.
-> 프로덕션 반영은 **CLI 배포(`vercel --prod`)로만** 합니다. PR 미리보기 배포는 그대로 켜져 있고,
-> 거기에는 문제 데이터가 없습니다.
+> 빠집니다. 그래서 `vercel.json` 의 `git.deploymentEnabled` 로 자동 배포를 전부(프로덕션·PR
+> 미리보기) 꺼 두었습니다. 배포는 **CLI 로만** 합니다 — 프로덕션은 `vercel --prod`, 미리보기는 `vercel`.
 >
 > 배포 URL 은 링크를 아는 누구나 접근할 수 있습니다. `robots.txt` 와 `noindex` 로
 > 검색 노출만 막아둔 상태이며, 접근 제한은 아닙니다.
