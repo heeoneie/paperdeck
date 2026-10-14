@@ -8,7 +8,7 @@
 <meta name="description" content="문제집을 카드로 바꿔 풀고 채점하는 학습 도구">
 <title>paperdeck</title>
 <script>try{var t=localStorage.getItem('pd_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-t',t)}catch(e){}</script>
-<link rel="stylesheet" href="app.css?v=00654c14e4">
+<link rel="stylesheet" href="app.css?v=7bbd91725c">
 </head><body>
 
 <div class="top" id="top" style="display:none">
@@ -19,24 +19,26 @@
   <div class="bar"><i id="pbar" style="width:0"></i></div>
 </div>
 
-<!-- 데이터 불러오기 -->
+<!-- 문제집 목록 · 파일에서 추가 -->
 <div class="scr on" id="scr-load"><div class="wrap">
   <h1>paperdeck</h1>
   <div class="sub1">문제집을 카드로 바꿔 풀고 채점합니다</div>
+  <div class="sec" id="libsec" style="display:none">문제집</div>
+  <div class="clist" id="lib"></div>
   <div class="drop" id="drop" style="display:none">
-    <b>데이터 파일을 여기에 놓거나 눌러서 고르세요</b>
-    <span>paperdeck 데이터 (.json)</span>
+    <b>파일에서 문제집 추가</b>
+    <span>paperdeck 데이터 (.json) 를 여기에 놓거나 눌러서 고르세요</span>
   </div>
   <input type="file" id="file" accept="application/json,.json" hidden>
   <div id="lstat"></div>
   <div class="hint" id="lhint" style="display:none">
     <span id="lhint0">이 사이트에는 문제가 들어 있지 않습니다. </span><b>가지고 계신 데이터 파일을 한 번 불러오면</b>
-    이 브라우저에 저장되어 다음부터는 바로 열립니다.<br><br>
+    이 브라우저에 저장되어 다음부터는 바로 열립니다. 여러 문제집을 더해 두고 골라 풀 수 있고,
+    진도는 문제집마다 따로 남습니다.<br><br>
     파일은 <code>{ "items": [...], "media": {...} }</code> 형태의 JSON입니다.
-    문제집 PDF에서 만드는 방법은 저장소의 <code>tools/</code> 를 보세요.<br><br>
+    문제집 PDF에서 만드는 방법은 저장소의 <code>tools/pdf2deck.py</code> 를 보세요.<br><br>
     불러온 데이터와 진도는 <b>이 기기의 브라우저에만</b> 저장되며 서버로 전송되지 않습니다.
   </div>
-  <button class="btn" id="ldef" style="display:none">기본 문제집으로 되돌리기<small>이 사이트에 들어 있는 문제집을 다시 받습니다</small></button>
   <button class="btn" id="lback" style="display:none">돌아가기<small>지금 문제집을 그대로 씁니다</small></button>
 </div></div>
 
@@ -54,7 +56,7 @@
   <button class="btn" id="bw"></button>
   <button class="btn" id="br">랜덤 문제<small id="brsub">연도 범위와 문항 수를 고릅니다</small></button>
   <div class="panel" id="rnd" hidden>
-    <div class="prow">
+    <div class="prow" id="rrange">
       <label>연도</label>
       <div class="pctl"><select id="ry1"></select><span class="tilde">~</span><select id="ry2"></select></div>
     </div>
@@ -65,16 +67,17 @@
     <label class="chk"><input type="checkbox" id="ronly"> 안 푼 문제만</label>
     <button class="btn pri" id="rgo" style="margin:12px 0 0">시작</button>
   </div>
-  <div class="sec">연도별</div>
+  <div class="sec" id="yrsec">연도별</div>
   <div class="yr" id="yr"></div>
   <div class="sec">기타</div>
   <button class="btn" id="reset">진도 초기화<small>이 기기에 저장된 기록을 지웁니다</small></button>
-  <button class="btn" id="swap">다른 문제집 불러오기<small>데이터 파일을 골라 현재 문제집을 교체합니다</small></button>
+  <button class="btn" id="swap">다른 문제집<small>문제집 목록 · 파일에서 추가</small></button>
   <div class="note">
-    채점은 띄어쓰기·가운뎃점·괄호·쉼표 차이를 무시하고 비슷한 답도 맞게 봅니다.
+    빈칸 문제의 채점은 띄어쓰기·가운뎃점·괄호·쉼표 차이를 무시하고 비슷한 답도 맞게 봅니다.
     그래도 애매하면 <b>?</b> 로 표시하니 직접 판단해 “맞게 처리”를 누르세요.
     그림을 그리는 문제는 채점이 안 되어 정답을 보고 직접 맞음/틀림을 고릅니다.<br>
-    진도는 이 브라우저에만 저장됩니다. 시크릿 모드나 다른 기기에서는 이어지지 않습니다.
+    객관식은 고른 보기가 정답과 같아야 맞음이고, 정답이 여러 개면 모두 골라야 합니다.<br>
+    진도는 문제집마다 이 브라우저에만 저장됩니다. 시크릿 모드나 다른 기기에서는 이어지지 않습니다.
   </div>
 </div></div>
 
@@ -87,11 +90,7 @@
   <h1>기출 보기</h1>
   <div class="sub1" id="csub"></div>
   <div class="moderow">
-    <div class="chips" id="cmode">
-      <button data-m="y" class="on">연도별</button>
-      <button data-m="c">개념별</button>
-      <button data-m="f">빈출순</button>
-    </div>
+    <div class="chips" id="cmode"></div>
   </div>
   <input class="search" id="csearch" type="search" placeholder="개념 이름으로 찾기"
          autocomplete="off" autocapitalize="off" spellcheck="false">
@@ -130,5 +129,5 @@
   </div>
 </div>
 
-<script src="app.js?v=0ed52be241"></script>
+<script src="app.js?v=833cc2d796"></script>
 </body></html>

@@ -5,13 +5,27 @@
 
 ## 이 저장소에 문제는 들어 있지 않습니다
 
-문제집 내용은 저작물이므로 저장소에도 배포본에도 포함하지 않습니다
-(`datasets/*.json` 은 `.gitignore` 처리).
-배포된 사이트를 처음 열면 **데이터 파일을 불러오는 화면**이 나옵니다.
+문제집 내용은 저작물이므로 저장소에는 포함하지 않습니다
+(`datasets/*.json`, `public/data/` 는 `.gitignore` 처리).
+사이트에 들어 있는 문제집이 없으면 처음 열 때 **문제집 목록 화면**에서 파일을 불러옵니다.
 한 번 불러오면 IndexedDB 에 저장되어 다음부터 바로 열립니다.
 데이터도 진도도 브라우저 안에만 있고 서버로 전송되지 않습니다.
 
+## 여러 문제집
+
+문제집을 여러 개 두고 골라 풀 수 있습니다. 홈의 **다른 문제집**을 누르면 목록이 나옵니다.
+
+- **사이트에 들어 있는 문제집** — `public/data/catalog.json` 에 적힌 것. 처음 열 때 받습니다.
+  하나뿐이면 목록 없이 바로 엽니다.
+- **파일에서 추가한 문제집** — 목록 아래 `파일에서 문제집 추가`. `삭제` 로 이 기기에서 지울 수 있습니다.
+- 진도는 문제집마다 따로 남습니다 (`localStorage['pd_prog:<id>']`).
+- 문제집을 하나만 두던 예전 버전에서 쓰던 데이터·진도는 처음 열 때 `ek` 문제집으로 옮겨집니다.
+
 ## 데이터 형식
+
+문제는 두 종류입니다. 한 문제집 안에 섞여 있어도 됩니다.
+
+**빈칸 문제** (전기기사 데이터)
 
 ```jsonc
 {
@@ -30,6 +44,31 @@
 
 `b[].t` 가 `img` 면 자동 채점이 불가능한 그림 정답이라 자기채점으로 넘어갑니다.
 
+**객관식 문제** (`tools/pdf2deck.py` 가 만드는 것)
+
+```jsonc
+{
+  "id": "driving", "title": "운전면허 학과시험", "subtitle": "…",
+  "media": { "m1a2b3c_….jpg": "<base64>" },        // png · jpg · webp · gif
+  "items": [{
+    "q": "mc",
+    "id": "2026년 2회 한국사#7",                    // 진도 키 (없으면 순번)
+    "no": 7,                                        // 시험지의 문제 번호
+    "t": "조선 후기 문화에 대한 설명으로…",          // 목록에 보이는 짧은 제목
+    "h": "<img class=\"qimg\" src=\"m1a2b3c_….png\">",  // 문제 (글자 또는 잘라낸 그림)
+    "o": ["ㄱ, ㄴ", "ㄱ, ㄹ", "ㄴ, ㄷ", "ㄷ, ㄹ"],    // 보기
+    "a": [2],                                       // 정답 보기 번호(0부터). 여러 개면 모두 골라야 맞음
+    "x": "풀이…",                                   // 해설 (선택)
+    "r": ["2026년 2회 한국사"], "y": ["26"],          // 회차·연도 (선택)
+    "p": 1
+  }]
+}
+```
+
+`y` 가 있으면 홈과 기출 보기가 **연도별**, 없고 모든 문제에 `r` 이 있으면 **회차별**,
+둘 다 없으면 **번호순 50문제씩**으로 묶습니다. 개념별은 빈칸 문제집에서만,
+빈출순은 여러 회차에 나온 문제가 있을 때만 보입니다.
+
 ## 채점 규칙 (`public/app.js` 의 `norm` / `judge` / `judgeSet`)
 
 비교 전에 무시하는 것: 띄어쓰기, 대소문자, 전각/반각(NFKC), 가운뎃점(ㆍ·•)과 쉼표,
@@ -47,7 +86,40 @@
 
 ## 데이터 만들기
 
-`tools/extract-ek/` 에 전기기사 서브노트 PDF → 데이터 변환기가 있습니다.
+### 객관식 문제집 PDF — `tools/pdf2deck.py`
+
+번호 매긴 객관식 기출 PDF 를 일반적으로 다룹니다. 문제는 줄 맨 앞의 `1.` `2.` …,
+보기는 ①~⑩ 으로 시작해야 하고, 1단·2단 조판 모두 됩니다.
+
+```bash
+uv venv tools/.venv && uv pip install --python tools/.venv/bin/python pymupdf pillow
+
+# 정답·해설이 문제 바로 아래 붙어 있는 문제집 (`■ 정답：2, 4` / `■ 해설：…`)
+tools/.venv/bin/python tools/pdf2deck.py 문제은행.pdf --mode text -o deck.json --title "운전면허 학과시험"
+
+# 시험지 + 따로 있는 정답표. --append 로 여러 과목·회차를 한 문제집에 모은다
+tools/.venv/bin/python tools/pdf2deck.py 한국사.pdf --key 정답표.pdf --key-match 한국사 \
+    --round "2026년 2회 한국사" -o deck.json --title "고졸 검정고시"
+```
+
+- `--mode image` (기본) — 문제 영역을 그림으로 잘라 넣습니다. 박스·도표가 많은 시험지도
+  원본 그대로 보입니다. 보기 글자를 읽을 수 있으면 보기는 글자 버튼, 아니면 보기까지 그림에 넣습니다.
+- `--mode text` — 글자로 넣고 문제 속 그림만 잘라 붙입니다. 글자 위주 문제집에 알맞습니다.
+- 실행 끝에 못 찾은 번호·정답 없는 문제를 알려 줍니다. 만든 파일은 앱의 `파일에서 문제집 추가` 로
+  바로 열어 볼 수 있습니다.
+
+테스트한 문제집 (공개 자료, 저장소에는 넣지 않음)
+
+| 문제집 | 모양 | 결과 |
+|---|---|---|
+| 도로교통공단 운전면허 학과시험 문제은행 (331쪽) | 1단, 정답·해설이 문제 아래, 사진·표지판 그림, 복수 정답 | 1000문제 전부 · 복수 정답 283 · 그림 290장 |
+| 한국교육과정평가원 2026년 2회 고졸 검정고시 한국사 + 정답표 | 2단, 박스·그림, 정답표 따로 | 25문제 전부, 정답표와 일치 |
+
+한계: 스캔본(글자 층이 없는 PDF), 번호가 `1.` 꼴이 아닌 문제집, 주관식·서술형 정답은 아직 못 다룹니다.
+
+### 전기기사 단답형 — `tools/extract-ek/`
+
+전기기사 서브노트 PDF → 빈칸 문제 데이터 변환기입니다.
 
 ```bash
 pip install pymupdf genanki scipy Pillow numpy
@@ -68,19 +140,25 @@ python s12_appdata.py   # → appdata.json
 정적 사이트라 빌드가 없습니다.
 
 ```bash
-python tools/publish-dataset.py appdata.json "전기기사 실기 단답형" "2001~2026년 기출"
+python tools/publish-dataset.py appdata.json "전기기사 실기 단답형" "2001~2026년 기출" --id ek
+python tools/publish-dataset.py deck.json --id driving     # 문제집 더 넣기
+python tools/publish-dataset.py --list                      # 사이트에 들어 있는 문제집
+python tools/publish-dataset.py --remove driving            # 목록에서 빼기
 python tools/stamp-assets.py     # 코드를 고쳤다면
 vercel deploy --prod --yes
 ```
+
+`--id` 는 진도 기록이 묶이는 이름이라 한 번 정하면 바꾸지 마세요. 전기기사는 `ek` 입니다.
 
 `stamp-assets.py` 는 `index.html` 의 `app.js` / `app.css` 링크에 내용 해시를 붙입니다
 (`app.js?v=52e622c5a1`). `index.html` 은 항상 재검증되므로 코드가 바뀌면 링크가 바뀌어
 **브라우저가 옛 코드를 계속 실행하는 일이 생기지 않습니다.**
 
-`publish-dataset.py` 는 `public/data/ek.json` 과 함께 **`version.json`** 을 만듭니다.
-앱은 시작할 때 캐시된 데이터를 바로 쓰고, 뒤에서 `version.json` 을 확인해
-버전이 다르면 조용히 새 데이터를 받아 교체합니다. 이 파일을 갱신하지 않으면
-이미 앱을 열어본 사람은 **예전 데이터를 계속 보게 됩니다.**
+`publish-dataset.py` 는 `public/data/<id>.json` 을 쓰고 **`catalog.json`** (문제집 목록과
+각 버전)을 갱신합니다. 앱은 시작할 때 받아 둔 데이터를 바로 쓰고, 뒤에서 `catalog.json` 을
+확인해 버전이 다르면 조용히 새 데이터를 받아 교체합니다. 이 스크립트를 거치지 않고 파일만
+바꾸면 이미 앱을 열어본 사람은 **예전 데이터를 계속 보게 됩니다.**
+(`catalog.json` 이 없는 예전 배포는 `ek.json` + `version.json` 하나로 읽습니다.)
 
 ### 주소 관련 함정
 
@@ -142,12 +220,12 @@ vercel alias  set  <deployment> paperdeck-app.vercel.app    # 로그인 벽에 �
 
 ## 진도 저장
 
-문제를 **채점하는 즉시** `localStorage['pd_prog']` 에 기록됩니다.
+문제를 **채점하는 즉시** `localStorage['pd_prog:<문제집 id>']` 에 기록됩니다.
 '다음 문제' 를 누르지 않고 앱을 닫아도 남고, '맞게 처리' 로 정정하면 갱신됩니다.
 
 ```jsonc
 { "차단기 약호|2026년 2회|2": { "n": 1, "ok": 1, "rate": 100, "last": 1788763790391 } }
-//  문제 키(제목|회차|페이지)      시도  전부맞음  정답률   마지막 시각
+//  문제 키(id, 없으면 제목|회차|페이지)  시도  전부맞음  정답률   마지막 시각
 ```
 
 입력한 답 자체와 세션 중간 위치는 저장하지 않습니다.
@@ -156,7 +234,7 @@ vercel alias  set  <deployment> paperdeck-app.vercel.app    # 로그인 벽에 �
 
 - 진도가 기기 사이에서 이어지지 않습니다 (localStorage / IndexedDB).
 - 서술형·그림 문제는 자동 채점이 안 됩니다.
-- 임의의 문제집 PDF 입력은 아직 지원하지 않습니다.
+- PDF 변환은 번호 매긴 객관식 문제집(`pdf2deck.py`)과 전기기사 책(`extract-ek/`)만 됩니다.
 
 ## 데이터를 배포에만 넣기
 
@@ -165,11 +243,11 @@ vercel alias  set  <deployment> paperdeck-app.vercel.app    # 로그인 벽에 �
 `.vercelignore` 만 보고 나머지 파일을 전부 업로드하기 때문입니다.
 
 ```bash
-cp datasets/<이름>.json public/data/ek.json
+python tools/publish-dataset.py datasets/<이름>.json --id <id>
 vercel --prod            # 로컬 파일이 그대로 올라감
 ```
 
-앱은 시작할 때 `data/ek.json` 을 먼저 찾고, 없으면 파일 불러오기 화면을 띄웁니다.
+앱은 시작할 때 `data/catalog.json` 을 보고, 들어 있는 문제집이 없으면 파일 불러오기 화면을 띄웁니다.
 
 > **주의** — GitHub 연동(자동 배포)은 저장소 내용만으로 배포하므로 `public/data/` 가
 > 빠집니다. 그래서 `vercel.json` 의 `git.deploymentEnabled` 로 자동 배포를 전부(프로덕션·PR
