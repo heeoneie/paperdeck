@@ -86,6 +86,19 @@
 
 ## 데이터 만들기
 
+### 앱에서 PDF 로 바로 — `public/pdfdeck.js`
+
+문제집 목록의 `파일에서 문제집 추가` 에 PDF 를 고르면 **브라우저 안에서** 문제집으로 바꿉니다.
+PDF 는 기기 밖으로 나가지 않습니다. 제목·회차·정답표 PDF(과목이 여럿이면 과목명)를 넣고
+`변환하기` → 결과 요약(문제 수 · 못 찾은 번호 · 뺀 문제)과 맨 앞 세 문제 미리 보기 → `이 문제집 추가`.
+
+- 아래 `pdf2deck.py` 를 PDF.js 로 옮긴 것이라 규칙이 같습니다. 2단 시험지는 자동으로 문제를 그림으로,
+  1단은 글자로 넣습니다(`모든 문제를 원본 그대로 그림으로` 로 바꿀 수 있음).
+- PDF.js 는 `public/vendor/pdfjs/` 에 파일로 넣어 두었습니다(앱 출시·오프라인 대비, CDN 안 씀).
+  처음 PDF 를 변환할 때만 불러옵니다. 버전을 올리려면 `sh tools/vendor-pdfjs.sh <버전>`.
+- 같은 PC(Chrome)에서 검정고시 한국사 2쪽 4초, 운전면허 문제은행 331쪽 41초 · 결과 11.8 MB.
+  폰에서는 더 걸립니다. 탭을 가려도 멈추지 않게 렌더링을 `print` intent 로 합니다.
+
 ### 객관식 문제집 PDF — `tools/pdf2deck.py`
 
 번호 매긴 객관식 기출 PDF 를 일반적으로 다룹니다. 문제는 줄 맨 앞의 `1.` `2.` …,
@@ -150,7 +163,7 @@ vercel deploy --prod --yes
 
 `--id` 는 진도 기록이 묶이는 이름이라 한 번 정하면 바꾸지 마세요. 전기기사는 `ek` 입니다.
 
-`stamp-assets.py` 는 `index.html` 의 `app.js` / `app.css` 링크에 내용 해시를 붙입니다
+`stamp-assets.py` 는 `index.html` 의 `app.js` / `app.css` 링크(와 `app.js` 안의 `pdfdeck.js`)에 내용 해시를 붙입니다
 (`app.js?v=52e622c5a1`). `index.html` 은 항상 재검증되므로 코드가 바뀌면 링크가 바뀌어
 **브라우저가 옛 코드를 계속 실행하는 일이 생기지 않습니다.**
 
@@ -234,7 +247,8 @@ vercel alias  set  <deployment> paperdeck-app.vercel.app    # 로그인 벽에 �
 
 - 진도가 기기 사이에서 이어지지 않습니다 (localStorage / IndexedDB).
 - 서술형·그림 문제는 자동 채점이 안 됩니다.
-- PDF 변환은 번호 매긴 객관식 문제집(`pdf2deck.py`)과 전기기사 책(`extract-ek/`)만 됩니다.
+- PDF 변환은 번호 매긴 객관식 문제집(앱 · `pdf2deck.py`)과 전기기사 책(`extract-ek/`)만 됩니다.
+  스캔본(글자 층이 없는 PDF)과 주관식 정답은 아직 못 다룹니다.
 
 ## 데이터를 배포에만 넣기
 

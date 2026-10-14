@@ -238,3 +238,18 @@ img.qimg{background:#fff;border-radius:6px}
 /* 연도가 아닌 묶음(회차 이름·번호 구간)은 이름이 길어 칸을 넓힌다 */
 .yr.wide{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
 .yr.wide b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- PDF 에서 문제집 만들기 ---------- */
+#pdfp{margin:6px 0 26px}
+.pname{font-weight:700;font-size:14px;margin-bottom:12px;word-break:break-all}
+.pin{flex:1;min-width:0;font:inherit;font-size:15px;padding:8px 10px;border:1px solid var(--line);
+ border-radius:8px;background:var(--bg);color:var(--ink)}
+.pkey{flex-wrap:wrap}
+.pkey span{font-size:12px;color:var(--dim);word-break:break-all}
+.pkey .fixbtn{margin-left:0}
+#pdfp .btn{margin-bottom:8px}
+#pstat{font-size:13px;color:var(--dim);text-align:center;min-height:20px;margin:4px 0}
+.pok{font-size:14px;margin:6px 0 8px}
+.pwarn{font-size:13px;color:var(--rd);line-height:1.7;margin:6px 0}
+.plist{font-size:12.5px;color:var(--am);margin:4px 0 12px;padding-left:18px;line-height:1.7}
+#pres .citem{border:1px solid var(--line)}

@@ -1160,42 +1160,131 @@ function validItem(it) {
   return Array.isArray(it.b);
 }
 
+/* 읽어 들인 문제집을 목록에 더하고 연다 (JSON 파일 · PDF 변환 결과 공통) */
+function addDeck(j, name, st) {
+  if (!j || !Array.isArray(j.items) || !j.items.length) {
+    st.textContent = 'paperdeck 데이터 형식이 아닙니다. (items 필드가 필요합니다)'; return;
+  }
+  var bad = j.items.filter(function (it) { return !validItem(it); }).length;
+  if (bad) {
+    st.textContent = 'paperdeck 데이터 형식이 아닙니다. (형식이 맞지 않는 문제 ' + bad + '개)'; return;
+  }
+  var id = j.id != null ? String(j.id) : slugId(j.title || name);
+  var had = libGet(id);
+  /* 사이트에 들어 있는 문제집과 id 가 겹치면 따로 둔다 */
+  if (had && had.src === 'bundled') id += '-file';
+  had = libGet(id);
+  if (had && !confirm('"' + (had.title || id) + '" 문제집이 이미 있습니다. 새 파일로 바꿀까요? (진도 기록은 남습니다)')) {
+    st.textContent = ''; return;
+  }
+  j.id = id;
+  j.title = j.title || name;
+  st.textContent = '저장 중…';
+  idbSet(dsKey(id), j).then(function () {
+    st.textContent = '';
+    $('#pdfp').hidden = true;
+    libPut({ id: id, title: j.title, subtitle: j.subtitle, n: j.items.length, src: 'file' });
+    activate(j);
+    home();
+  }).catch(function (e) { st.textContent = '저장 실패: ' + e; });
+}
+
+function mb(n) { return Math.round(n / 1e6 * 10) / 10 + ' MB'; }
+function isPdf(f) { return /\.pdf$/i.test(f.name) || f.type === 'application/pdf'; }
+
 function acceptFile(f) {
   if (!f) return;
+  if (isPdf(f)) { pdfPanel(f); return; }
   var st = $('#lstat');
-  st.textContent = '읽는 중… (' + Math.round(f.size / 1e6 * 10) / 10 + ' MB)';
+  st.textContent = '읽는 중… (' + mb(f.size) + ')';
   var fr = new FileReader();
   fr.onerror = function () { st.textContent = '파일을 읽지 못했습니다.'; };
   fr.onload = function () {
     var j;
     try { j = JSON.parse(fr.result); }
     catch (e) { st.textContent = 'JSON 파일이 아닙니다.'; return; }
-    if (!j || !Array.isArray(j.items) || !j.items.length) {
-      st.textContent = 'paperdeck 데이터 형식이 아닙니다. (items 필드가 필요합니다)'; return;
-    }
-    var bad = j.items.filter(function (it) { return !validItem(it); }).length;
-    if (bad) {
-      st.textContent = 'paperdeck 데이터 형식이 아닙니다. (형식이 맞지 않는 문제 ' + bad + '개)'; return;
-    }
-    var id = j.id != null ? String(j.id) : slugId(j.title || f.name.replace(/\.json$/i, ''));
-    var had = libGet(id);
-    /* 사이트에 들어 있는 문제집과 id 가 겹치면 따로 둔다 */
-    if (had && had.src === 'bundled') id += '-file';
-    had = libGet(id);
-    if (had && !confirm('"' + (had.title || id) + '" 문제집이 이미 있습니다. 새 파일로 바꿀까요? (진도 기록은 남습니다)')) {
-      st.textContent = ''; return;
-    }
-    j.id = id;
-    j.title = j.title || f.name.replace(/\.json$/i, '');
-    st.textContent = '저장 중…';
-    idbSet(dsKey(id), j).then(function () {
-      st.textContent = '';
-      libPut({ id: id, title: j.title, subtitle: j.subtitle, n: j.items.length, src: 'file' });
-      activate(j);
-      home();
-    }).catch(function (e) { st.textContent = '저장 실패: ' + e; });
+    addDeck(j, f.name.replace(/\.json$/i, ''), st);
   };
   fr.readAsText(f);
+}
+
+/* ---------- PDF 에서 문제집 만들기 — 변환은 pdfdeck.js(PDF.js)로 이 기기 안에서 ---------- */
+var PDFDECK = 'pdfdeck.js?v=f9f07e5f27';     /* stamp-assets.py 가 ?v= 를 붙인다 */
+var PDF = { file: null, key: null, out: null };
+function pdfPanel(f) {
+  PDF = { file: f, key: null, out: null };
+  $('#lstat').textContent = '';
+  $('#pname').textContent = f.name + ' · ' + mb(f.size);
+  $('#pt').value = f.name.replace(/\.pdf$/i, '');
+  $('#pr').value = ''; $('#pkm').value = '';
+  $('#pkname').textContent = '없으면 문제 아래 "정답:" 줄에서 읽습니다';
+  $('#pkmrow').hidden = true;
+  $('#pimg').checked = false;
+  $('#pstat').textContent = ''; $('#pres').innerHTML = '';
+  $('#pgo').disabled = false;
+  $('#pdfp').hidden = false;
+  $('#pdfp').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+$('#pkbtn').onclick = function () { $('#kfile').click(); };
+$('#kfile').addEventListener('change', function () {
+  var f = this.files[0]; this.value = '';
+  if (!f) return;
+  PDF.key = f;
+  $('#pkname').textContent = f.name;
+  $('#pkmrow').hidden = false;
+});
+$('#pcancel').onclick = function () { $('#pdfp').hidden = true; PDF = { file: null, key: null, out: null }; };
+$('#pgo').onclick = function () {
+  var b = this, t0 = Date.now();
+  if (!PDF.file) return;
+  b.disabled = true;
+  $('#pres').innerHTML = '';
+  $('#pstat').textContent = '변환 준비 중…';
+  import('./' + PDFDECK).then(function (m) {
+    return m.convert(PDF.file, {
+      title: $('#pt').value, round: $('#pr').value, image: $('#pimg').checked,
+      key: PDF.key, keyMatch: $('#pkm').value.trim(),
+      onProgress: function (s) { $('#pstat').textContent = s; }
+    });
+  }).then(function (out) {
+    b.disabled = false;
+    PDF.out = out;
+    $('#pstat').textContent = '변환 끝 · ' + Math.round((Date.now() - t0) / 1000) + '초';
+    paintPdfResult(out);
+  }).catch(function (e) {
+    b.disabled = false;
+    $('#pstat').textContent = '변환하지 못했습니다: ' + (e && e.message || e);
+  });
+};
+
+function paintPdfResult(out) {
+  var r = out.report, d = out.deck, h = [];
+  if (!d.items.length) {
+    h.push('<div class="pwarn">문제를 찾지 못했습니다. 문제 번호가 <b>1.</b> 꼴이고 보기가 <b>①</b> 로 시작하는 ' +
+           '객관식 문제집인지, 글자를 고를 수 없는 스캔본 PDF 가 아닌지 확인해 주세요.' +
+           (r.found && !r.items ? ' (문제 번호는 ' + r.found + '개 찾았지만 정답을 읽지 못했습니다 — 정답표 PDF 를 함께 골라 보세요.)' : '') + '</div>');
+  } else {
+    h.push('<div class="pok"><b>문제 ' + d.items.length + '개</b>' +
+           (r.multi ? ' · 복수 정답 ' + r.multi : '') + ' · 그림 ' + r.images + '장 · ' + r.pages + '쪽' +
+           (r.twoCol ? ' (2단 ' + r.twoCol + '쪽)' : '') + '</div>');
+  }
+  var w = r.warn.slice();
+  if (r.gaps.length) w.push('못 찾은 번호: ' + r.gaps.slice(0, 15).join(', ') + (r.gaps.length > 15 ? ' 외 ' + (r.gaps.length - 15) + '개' : ''));
+  if (r.skipped.length) w.push('뺀 문제: ' + r.skipped.slice(0, 10).map(function (x) { return x[0] + '번(' + x[1] + ')'; }).join(', ') +
+                               (r.skipped.length > 10 ? ' 외 ' + (r.skipped.length - 10) + '개' : ''));
+  if (w.length) h.push('<ul class="plist">' + w.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>');
+  if (d.items.length) {
+    h.push('<button class="btn pri" id="padd" type="button">이 문제집 추가</button>');
+    /* 맨 앞 세 문제를 답이 보이는 채로 미리 보여준다 */
+    var keep = MED; MED = d.media;
+    normalize(d);
+    h.push('<div class="sec">미리 보기</div>' + d.items.slice(0, 3).map(function (it) {
+      return '<div class="citem"><div class="cnum">' + (it.no || '') + '</div>' + renderSolved(it) + '</div>';
+    }).join(''));
+    MED = keep;
+  }
+  $('#pres').innerHTML = h.join('');
+  if ($('#padd')) $('#padd').onclick = function () { addDeck(PDF.out.deck, PDF.file.name.replace(/\.pdf$/i, ''), $('#pstat')); };
 }
 
 function boot() {
