@@ -204,3 +204,37 @@ td input.ipt{width:100%;min-width:56px}
 .citem img{max-width:100%;height:auto;display:block;margin:8px auto;border-radius:4px}
 /* 오른쪽 위 번호 배지 자리를 비워 둔다 — 긴 제목이 배지 밑으로 들어가지 않게 */
 .citem>.title{max-width:calc(100% - 34px)}
+
+/* ---------- 객관식 ---------- */
+.qs{font-weight:600;margin-bottom:8px}
+.qh{margin:8px 0;padding:8px 12px 8px 28px;background:var(--bg);border-radius:8px;font-size:14px}
+img.qimg{background:#fff;border-radius:6px}
+.opts{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.opt{display:flex;gap:10px;align-items:flex-start;width:100%;padding:11px 12px;text-align:left;
+ border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);
+ font:inherit;font-size:15px;line-height:1.5;cursor:pointer}
+.opt .oi{flex:none;font-weight:700;color:var(--dim)}
+.opt .ot{flex:1;min-width:0}
+.opt .ot img{max-height:140px;width:auto;margin:2px 0}
+.opt.sel{border-color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac)}
+.opt.sel .oi{color:var(--ac)}
+.opt.ok{border-color:var(--gr);background:var(--grbg)}
+.opt.ok .oi{color:var(--gr)}
+.opt.bad{border-color:var(--rd);background:var(--rdbg)}
+.opt.bad .oi{color:var(--rd)}
+.opt:disabled{cursor:default;color:var(--ink);opacity:1}
+.opts.done .opt{cursor:default}
+.mcn{margin:10px 0 0}
+.xp{margin-top:14px;padding:10px 12px;border-radius:8px;background:var(--bg);font-size:14px;line-height:1.7}
+.xp>b{display:block;font-size:12px;color:var(--dim);margin-bottom:2px}
+
+/* ---------- 문제집 목록 ---------- */
+.lrow .cname small{display:block;font-weight:400;font-size:12px;color:var(--dim);
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lrow.cur .cname{color:var(--ac)}
+.lrow .ldel{flex:none;margin:0}
+#lib{margin-bottom:6px}
+#lback{margin-top:4px}
+/* 연도가 아닌 묶음(회차 이름·번호 구간)은 이름이 길어 칸을 넓힌다 */
+.yr.wide{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.yr.wide b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
