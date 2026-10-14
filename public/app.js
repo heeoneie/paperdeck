@@ -1160,7 +1160,8 @@ function validItem(it) {
   return Array.isArray(it.b);
 }
 
-/* 읽어 들인 문제집을 목록에 더하고 연다 (JSON 파일 · PDF 변환 결과 공통) */
+/* 읽어 들인 문제집을 목록에 더하고 연다 (JSON 파일 · PDF 변환 결과 공통).
+   저장을 시작했으면 true. */
 function addDeck(j, name, st) {
   if (!j || !Array.isArray(j.items) || !j.items.length) {
     st.textContent = 'paperdeck 데이터 형식이 아닙니다. (items 필드가 필요합니다)'; return;
@@ -1175,7 +1176,7 @@ function addDeck(j, name, st) {
   if (had && had.src === 'bundled') id += '-file';
   had = libGet(id);
   if (had && !confirm('"' + (had.title || id) + '" 문제집이 이미 있습니다. 새 파일로 바꿀까요? (진도 기록은 남습니다)')) {
-    st.textContent = ''; return;
+    st.textContent = ''; return false;
   }
   j.id = id;
   j.title = j.title || name;
@@ -1187,6 +1188,7 @@ function addDeck(j, name, st) {
     activate(j);
     home();
   }).catch(function (e) { st.textContent = '저장 실패: ' + e; });
+  return true;
 }
 
 function mb(n) { return Math.round(n / 1e6 * 10) / 10 + ' MB'; }
@@ -1209,9 +1211,12 @@ function acceptFile(f) {
 }
 
 /* ---------- PDF 에서 문제집 만들기 — 변환은 pdfdeck.js(PDF.js)로 이 기기 안에서 ---------- */
-var PDFDECK = 'pdfdeck.js?v=f9f07e5f27';     /* stamp-assets.py 가 ?v= 를 붙인다 */
+var PDFDECK = 'pdfdeck.js?v=0c688f04ca';     /* stamp-assets.py 가 ?v= 를 붙인다 */
 var PDF = { file: null, key: null, out: null };
+/* 변환 차례 번호. 새 PDF 를 고르거나 취소하면 올라가서, 돌고 있던 변환은 멈추고 결과를 버린다. */
+var PDFGEN = 0;
 function pdfPanel(f) {
+  PDFGEN++;
   PDF = { file: f, key: null, out: null };
   $('#lstat').textContent = '';
   $('#pname').textContent = f.name + ' · ' + mb(f.size);
@@ -1233,9 +1238,10 @@ $('#kfile').addEventListener('change', function () {
   $('#pkname').textContent = f.name;
   $('#pkmrow').hidden = false;
 });
-$('#pcancel').onclick = function () { $('#pdfp').hidden = true; PDF = { file: null, key: null, out: null }; };
+$('#pcancel').onclick = function () { PDFGEN++; $('#pdfp').hidden = true; PDF = { file: null, key: null, out: null }; };
 $('#pgo').onclick = function () {
-  var b = this, t0 = Date.now();
+  var b = this, t0 = Date.now(), gen = ++PDFGEN, mine = PDF;
+  function live() { return gen === PDFGEN; }
   if (!PDF.file) return;
   b.disabled = true;
   $('#pres').innerHTML = '';
@@ -1244,14 +1250,17 @@ $('#pgo').onclick = function () {
     return m.convert(PDF.file, {
       title: $('#pt').value, round: $('#pr').value, image: $('#pimg').checked,
       key: PDF.key, keyMatch: $('#pkm').value.trim(),
+      cancelled: function () { return !live(); },
       onProgress: function (s) { $('#pstat').textContent = s; }
     });
   }).then(function (out) {
+    if (!live()) return;
     b.disabled = false;
-    PDF.out = out;
+    mine.out = out;
     $('#pstat').textContent = '변환 끝 · ' + Math.round((Date.now() - t0) / 1000) + '초';
     paintPdfResult(out);
   }).catch(function (e) {
+    if (!live()) return;
     b.disabled = false;
     $('#pstat').textContent = '변환하지 못했습니다: ' + (e && e.message || e);
   });
@@ -1277,14 +1286,20 @@ function paintPdfResult(out) {
     h.push('<button class="btn pri" id="padd" type="button">이 문제집 추가</button>');
     /* 맨 앞 세 문제를 답이 보이는 채로 미리 보여준다 */
     var keep = MED; MED = d.media;
-    normalize(d);
-    h.push('<div class="sec">미리 보기</div>' + d.items.slice(0, 3).map(function (it) {
-      return '<div class="citem"><div class="cnum">' + (it.no || '') + '</div>' + renderSolved(it) + '</div>';
-    }).join(''));
-    MED = keep;
+    try {
+      normalize(d);
+      h.push('<div class="sec">미리 보기</div>' + d.items.slice(0, 3).map(function (it) {
+        return '<div class="citem"><div class="cnum">' + (it.no || '') + '</div>' + renderSolved(it) + '</div>';
+      }).join(''));
+    } finally { MED = keep; }
   }
   $('#pres').innerHTML = h.join('');
-  if ($('#padd')) $('#padd').onclick = function () { addDeck(PDF.out.deck, PDF.file.name.replace(/\.pdf$/i, ''), $('#pstat')); };
+  /* 이 결과를 만든 PDF 이름을 붙잡아 둔다 — 그 사이 다른 PDF 를 골라도 섞이지 않게 */
+  var name = PDF.file.name.replace(/\.pdf$/i, '');
+  if ($('#padd')) $('#padd').onclick = function () {
+    this.disabled = true;
+    if (!addDeck(d, name, $('#pstat'))) this.disabled = false;
+  };
 }
 
 function boot() {

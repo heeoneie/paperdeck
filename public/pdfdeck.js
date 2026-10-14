@@ -40,7 +40,12 @@ async function openPdf(file) {
     data: data, cMapUrl: BASE + 'cmaps/', cMapPacked: true,
     standardFontDataUrl: BASE + 'standard_fonts/', wasmUrl: BASE + 'wasm/'
   });
-  var doc = await task.promise;
+  var doc;
+  try { doc = await task.promise; }
+  catch (e) {
+    try { task.destroy(); } catch (e2) {}
+    throw /password/i.test(e && e.name || '') ? new Error('암호가 걸린 PDF 는 열 수 없습니다.') : e;
+  }
   doc.closeAll = function () { try { task.destroy(); } catch (e) {} };
   return doc;
 }
@@ -124,6 +129,7 @@ async function readPage(doc, pn) {
     }
   }
   pg.split = columns(pg);
+  page.cleanup();          /* 연산 목록·그림 디코딩 결과를 놓는다 (큰 문제집에서 메모리) */
   return pg;
 }
 function pushLine(pg, r) {
@@ -230,33 +236,45 @@ function objectsBetween(pages, a, b) {
 }
 
 /* ---------------------------------------------------------------- 그림 */
-function Renderer() { this.cache = {}; }
-Renderer.prototype.canvas = async function (pg) {
-  if (this.cache[pg.pn]) return this.cache[pg.pn];
-  var keys = Object.keys(this.cache);
-  if (keys.length >= 3) { var old = this.cache[keys[0]]; old.width = old.height = 0; delete this.cache[keys[0]]; }
-  var vp = pg.page.getViewport({ scale: SCALE });
+var MAXPX = 16e6;        /* 사파리 캔버스 한도(약 1,670만 화소) 안으로 */
+function Renderer() { this.cache = new Map(); }
+/* pin: 지금 자르는 중이라 버리면 안 되는 쪽 번호들 */
+Renderer.prototype.canvas = async function (pg, pin) {
+  if (this.cache.has(pg.pn)) return this.cache.get(pg.pn);
+  for (var it = this.cache.keys(), k = it.next(); this.cache.size >= 3 && !k.done; k = it.next()) {
+    if (pin && pin.indexOf(k.value) >= 0) continue;
+    this.drop(k.value);
+  }
+  var sc = Math.min(SCALE, Math.sqrt(MAXPX / (pg.W * pg.H)));
+  var vp = pg.page.getViewport({ scale: sc });
   var cv = document.createElement('canvas');
   cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height);
   var ctx = cv.getContext('2d');
+  if (!ctx) throw new Error(pg.pn + 1 + '쪽을 그릴 메모리가 부족합니다.');
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
   /* intent 'print': 화면용 렌더는 requestAnimationFrame 에 묶여 있어 탭이 가려지면 멈춘다 */
   await pg.page.render({ canvas: cv, canvasContext: ctx, viewport: vp, intent: 'print' }).promise;
-  this.cache[pg.pn] = cv;
+  cv.sc = sc;
+  this.cache.set(pg.pn, cv);
   return cv;
 };
+Renderer.prototype.drop = function (pn) {
+  var cv = this.cache.get(pn);
+  if (!cv) return;
+  cv.width = cv.height = 0;
+  this.cache.delete(pn);
+};
 Renderer.prototype.done = function () {
-  var c = this.cache;
-  Object.keys(c).forEach(function (k) { c[k].width = c[k].height = 0; });
-  this.cache = {};
+  var self = this;
+  Array.from(this.cache.keys()).forEach(function (pn) { self.drop(pn); });
 };
 /* [{pg, x0,y0,x1,y1}] 를 잘라 세로로 이어 붙인다 */
 async function cropStack(R, pieces) {
-  var parts = [];
+  var parts = [], pin = pieces.map(function (p) { return p.pg.pn; });
   for (var i = 0; i < pieces.length; i++) {
-    var p = pieces[i], cv = await R.canvas(p.pg);
-    var x0 = Math.max(0, p.x0) * SCALE, y0 = Math.max(0, p.y0) * SCALE;
-    var w = Math.min(cv.width - x0, (p.x1 - p.x0) * SCALE), h = Math.min(cv.height - y0, (p.y1 - p.y0) * SCALE);
+    var p = pieces[i], cv = await R.canvas(p.pg, pin), sc = cv.sc;
+    var x0 = Math.max(0, p.x0) * sc, y0 = Math.max(0, p.y0) * sc;
+    var w = Math.min(cv.width - x0, (p.x1 - p.x0) * sc), h = Math.min(cv.height - y0, (p.y1 - p.y0) * sc);
     if (w > 2 && h > 2) parts.push({ cv: cv, x: x0, y: y0, w: w, h: h });
   }
   if (!parts.length) return null;
@@ -395,12 +413,13 @@ async function buildItem(R, pages, seg, nxt, no, opt, media, inline) {
 /* ---------------------------------------------------------------- 정답표 */
 async function readKey(file, match, progress) {
   var doc = await openPdf(file), texts = [];
-  for (var i = 0; i < doc.numPages; i++) {
-    var p = await doc.getPage(i + 1), tc = await p.getTextContent();
-    texts.push(tc.items.map(function (x) { return x.str; }).join(' ').replace(ALT_RE, function (c) { return ALT[c]; }));
-    progress('정답표 ' + (i + 1) + '/' + doc.numPages + '쪽');
-  }
-  doc.closeAll();
+  try {
+    for (var i = 0; i < doc.numPages; i++) {
+      var p = await doc.getPage(i + 1), tc = await p.getTextContent();
+      texts.push(tc.items.map(function (x) { return x.str; }).join(' ').replace(ALT_RE, function (c) { return ALT[c]; }));
+      progress('정답표 ' + (i + 1) + '/' + doc.numPages + '쪽');
+    }
+  } finally { doc.closeAll(); }
   var pick = texts.filter(function (t) { return !match || t.indexOf(match) >= 0; });
   if (!pick.length) throw new Error('정답표에서 "' + match + '" 가 들어 있는 쪽을 찾지 못했습니다.');
   var toks = pick[0].match(/[①-⑩]+|\d+/g) || [], key = {};
@@ -411,13 +430,22 @@ async function readKey(file, match, progress) {
 }
 
 /* ---------------------------------------------------------------- 변환
-   opt: { title, round, image(항상 그림으로), key(정답표 File), keyMatch, onProgress } */
+   opt: { title, round, image(항상 그림으로), key(정답표 File), keyMatch, onProgress,
+          cancelled() — true 를 돌려주면 쪽·문제 사이에서 멈추고 'cancelled' 를 던진다 } */
 export async function convert(file, opt) {
   opt = opt || {};
-  var progress = opt.onProgress || function () {};
+  var cancelled = opt.cancelled || function () { return false; };
+  var progress = function (s) { if (cancelled()) throw new Error('cancelled'); (opt.onProgress || function () {})(s); };
   progress('PDF 여는 중…');
-  var doc = await openPdf(file), pages = [];
+  var doc = await openPdf(file);
+  try { return await run(doc, file, opt, progress, cancelled); }
+  finally { doc.closeAll(); }
+}
+
+async function run(doc, file, opt, progress, cancelled) {
+  var pages = [];
   for (var i = 0; i < doc.numPages; i++) {
+    if (cancelled()) throw new Error('cancelled');
     pages.push(await readPage(doc, i));
     if (i % 5 === 4 || i === doc.numPages - 1) progress('읽는 중 ' + (i + 1) + '/' + doc.numPages + '쪽');
   }
@@ -434,6 +462,7 @@ export async function convert(file, opt) {
   var R = new Renderer(), items = [], skipped = [];
   try {
     for (var a = 0; a < anc.length; a++) {
+      if (cancelled()) throw new Error('cancelled');
       var s = anc[a][0], no = anc[a][1];
       var end = a + 1 < anc.length ? anc[a + 1][0] : lines.length;
       var nxt = end < lines.length ? lines[end] : null;
@@ -451,7 +480,6 @@ export async function convert(file, opt) {
     }
   } finally {
     R.done();
-    doc.closeAll();
   }
   var nums = anc.map(function (x) { return x[1]; }), max = nums.length ? Math.max.apply(0, nums) : 0, gaps = [];
   for (var n = 1; n <= max; n++) if (nums.indexOf(n) < 0) gaps.push(n);
