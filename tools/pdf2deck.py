@@ -125,7 +125,7 @@ def repeated_lines(pages):
 def stream(pages):
     """읽는 순서(쪽 → 단 → 위에서 아래)로 줄을 늘어놓는다"""
     rep = repeated_lines(pages)
-    out = []
+    out, first_seen = [], [False]
     for pg in pages:
         ls = []
         for l in pg.lines:
@@ -138,11 +138,13 @@ def stream(pages):
             l['c'] = c
             ls.append(l)
         ls.sort(key=lambda l: (l['c'], round(l['y0'] / 3), l['x0']))
-        # 첫 쪽의 시험지 제목처럼 머리에만 있는 것: 위쪽 띠에 문제 번호가 있으면
-        # 그보다 위의 줄은 버린다. 두 단 모두 앞 문제가 이어지는 쪽은 번호가 아래에 있어 건드리지 않는다.
+        # 시험지 제목처럼 머리에만 있는 것: 첫 문제 번호가 나오는 쪽에서만, 그 번호보다 위의 줄을 버린다.
+        # 다른 쪽에서는 위쪽에 앞 문제의 보기가 이어질 수 있어 건드리지 않는다(반복되는 머리말은 위에서 걸러짐).
         tops = [l['y0'] for l in ls if ANCHOR.match(l['t'])]
-        if tops and min(tops) < pg.H * 0.2:
-            ls = [l for l in ls if not l['y1'] < min(tops) - 1]
+        if tops and not first_seen[0]:
+            first_seen[0] = True
+            if min(tops) < pg.H * 0.2:
+                ls = [l for l in ls if not l['y1'] < min(tops) - 1]
         out += ls
     return out
 
@@ -412,7 +414,9 @@ def main():
             skipped.append((no, '정답 없음')); continue
         if max(it['a']) >= len(it['o']):
             skipped.append((no, '정답 번호가 보기 수보다 큼')); continue
-        it['id'] = '%s#%d' % (rnd or os.path.splitext(os.path.basename(a.pdf))[0], no)
+        # 회차만으로는 --append 로 모은 과목끼리 번호가 겹친다 — 파일 이름도 넣는다
+        base = os.path.splitext(os.path.basename(a.pdf))[0]
+        it['id'] = '%s#%d' % (rnd + '|' + base if rnd else base, no)
         it['r'] = [rnd] if rnd else []
         it['y'] = [year] if year else []
         items.append(it)

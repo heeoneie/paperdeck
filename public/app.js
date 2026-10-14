@@ -951,25 +951,49 @@ function slugId(s) {
   return String(s || '').trim().replace(/\s+/g, '-').replace(/[^\w\-가-힣]/g, '').slice(0, 40) || 'deck';
 }
 
-/* 문제집을 하나만 두던 때의 데이터·진도를 목록으로 옮긴다 (한 번만) */
-function migrate() {
-  if (LIB) return Promise.resolve();
-  LIB = [];
-  return idbGet(LEGACY).then(function (d) {
-    if (!d || !d.items) return;
-    var id = d.id || (d.local ? slugId(d.title) : 'ek');
-    d.id = id;
-    return idbSet(dsKey(id), d).then(function () {
-      LIB.push({ id: id, title: d.title, subtitle: d.subtitle, n: d.items.length, v: d.v,
-                 src: d.local ? 'file' : 'bundled', file: d.local ? null : 'ek.json' });
-      try {
-        var old = localStorage.getItem('pd_prog');
-        if (old && !localStorage.getItem('pd_prog:' + id)) localStorage.setItem('pd_prog:' + id, old);
-        localStorage.setItem(CURK, id);
-      } catch (e) {}
-      return idbDel(LEGACY);
+/* 예전 진도(pd_prog)를 문제집별 진도에 합친다. 같은 문제는 나중에 푼 기록이 이긴다.
+   진도 키는 문제집마다 달라서(전기기사: 제목|회차|쪽) 여러 문제집에 합쳐도 섞이지 않는다.
+   예전 앱을 띄운 채로 둔 탭이 배포 뒤에도 pd_prog 에 쓸 수 있어 부팅 때마다 확인한다. */
+function mergeLegacyProg(ids) {
+  try {
+    var old = JSON.parse(localStorage.getItem('pd_prog') || 'null');
+    if (!old) return;
+    ids.forEach(function (id) {
+      var k = 'pd_prog:' + id, cur = JSON.parse(localStorage.getItem(k) || '{}');
+      Object.keys(old).forEach(function (q) {
+        if (!cur[q] || (old[q].last || 0) > (cur[q].last || 0)) cur[q] = old[q];
+      });
+      localStorage.setItem(k, JSON.stringify(cur));
     });
-  }).catch(function () {}).then(libSave);
+    localStorage.removeItem('pd_prog');
+  } catch (e) {}
+}
+
+/* 문제집을 하나만 두던 때의 데이터(IndexedDB 'pd_ds')·진도를 새 구조로 옮긴다.
+   실패하면 예전 데이터를 지우지 않고 다음 부팅에 다시 해 본다. */
+function migrate() {
+  if (!LIB) LIB = [];
+  return idbGet(LEGACY).catch(function () { return null; }).then(function (d) {
+    var ids = ['ek'];
+    if (!d || !d.items) { mergeLegacyProg(ids); return; }
+    var id = String(d.id || (d.local ? slugId(d.title) : 'ek'));
+    if (id !== 'ek') ids.push(id);
+    /* 예전 앱에서 직접 불러온 문제집을 쓰던 사람도 전기기사 진도는 pd_prog 에 같이 있었다 */
+    mergeLegacyProg(ids);
+    d.id = id;
+    return idbGet(dsKey(id)).catch(function () { return null; }).then(function (have) {
+      /* 이미 옮긴 뒤 예전 탭이 다시 만든 것이면 그냥 지운다 */
+      return have ? null : idbSet(dsKey(id), d);
+    }).then(function () {
+      if (!libGet(id)) {
+        LIB.push({ id: id, title: d.title, subtitle: d.subtitle, n: d.items.length, v: d.v,
+                   src: d.local ? 'file' : 'bundled', file: d.local ? null : 'ek.json' });
+        libSave();
+      }
+      try { if (!localStorage.getItem(CURK)) localStorage.setItem(CURK, id); } catch (e) {}
+      return idbDel(LEGACY);
+    }).catch(function () {});
+  });
 }
 
 /* 문제마다 빠질 수 있는 필드를 채운다 */
@@ -1003,6 +1027,7 @@ function activate(d) {
 }
 
 /* 사이트에 들어 있는 문제집 목록. catalog.json 이 없는 예전 배포는 ek.json 하나. */
+/* 받지 못하면 null — 그때는 목록을 건드리지 않는다 (오프라인에서 사이트 문제집이 사라지지 않게) */
 function fetchCatalog() {
   return fetch('data/catalog.json', { cache: 'no-store' }).then(function (r) {
     return r.ok ? r.json() : null;
@@ -1012,10 +1037,11 @@ function fetchCatalog() {
       return r.ok ? r.json() : null;
     }).then(function (m) {
       return m && m.v ? [{ id: m.id || 'ek', file: 'ek.json', v: m.v, title: m.title, n: m.n }] : [];
-    }).catch(function () { return []; });
+    }).catch(function () { return null; });
   });
 }
 function mergeCatalog(list) {
+  if (!list) return;
   var ids = list.map(function (c) { return c.id; });
   list.forEach(function (c) {
     var m = libGet(c.id);
@@ -1036,11 +1062,10 @@ function download(m) {
   }).then(function (j) {
     if (!j || !Array.isArray(j.items)) throw 0;
     j.id = m.id;
-    return idbSet(dsKey(m.id), j).then(function () {
-      m.v = j.v; m.n = j.items.length; m.title = j.title || m.title; m.subtitle = j.subtitle || m.subtitle;
-      libPut(m);
-      return j;
-    });
+    m.n = j.items.length; m.title = j.title || m.title; m.subtitle = j.subtitle || m.subtitle;
+    /* 저장에 실패해도(저장 공간 부족 등) 이번에는 받은 것으로 연다. v 를 안 적어 두면 다음에 다시 받는다. */
+    return idbSet(dsKey(m.id), j).then(function () { m.v = j.v; }).catch(function () {})
+      .then(function () { libPut(m); return j; });
   });
 }
 
@@ -1152,7 +1177,7 @@ function acceptFile(f) {
     if (bad) {
       st.textContent = 'paperdeck 데이터 형식이 아닙니다. (형식이 맞지 않는 문제 ' + bad + '개)'; return;
     }
-    var id = j.id || slugId(j.title || f.name.replace(/\.json$/i, ''));
+    var id = j.id != null ? String(j.id) : slugId(j.title || f.name.replace(/\.json$/i, ''));
     var had = libGet(id);
     /* 사이트에 들어 있는 문제집과 id 가 겹치면 따로 둔다 */
     if (had && had.src === 'bundled') id += '-file';
@@ -1187,7 +1212,7 @@ function boot() {
       return fetchCatalog().then(function (list) {
         mergeCatalog(list);
         if (ok) { maybeUpdate(); return; }
-        $('#lstat').textContent = '';
+        $('#lstat').textContent = list ? '' : '문제집 목록을 받지 못했습니다. 인터넷 연결을 확인해 주세요.';
         /* 고를 것이 하나뿐이면 바로 연다 */
         if (LIB.length === 1) return openDeck(LIB[0].id);
         paintLib();

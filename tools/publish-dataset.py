@@ -94,6 +94,11 @@ def main():
              'subtitle': d.get('subtitle', ''), 'n': len(d['items'])}
     cat['decks'] = [x for x in cat['decks'] if x['id'] != d['id']] + [entry]
     save_catalog(data, cat)
+    # catalog.json 이전 앱(배포 직후 아직 새로 고치지 않은 탭)은 ek.json + version.json 을 본다.
+    # 버전이 어긋나면 매번 다시 받으므로 ek 를 올릴 때 같이 맞춘다.
+    if d['id'] == 'ek':
+        json.dump({'v': d['v'], 'n': len(d['items']), 'title': d['title']},
+                  open(os.path.join(data, 'version.json'), 'w', encoding='utf-8'), ensure_ascii=False)
 
     # 저장소 밖 보관용 사본 (datasets/ 는 .gitignore)
     if os.path.abspath(a.site) == os.path.join(ROOT, 'public'):
