@@ -1211,7 +1211,7 @@ function acceptFile(f) {
 }
 
 /* ---------- PDF 에서 문제집 만들기 — 변환은 pdfdeck.js(PDF.js)로 이 기기 안에서 ---------- */
-var PDFDECK = 'pdfdeck.js?v=0c688f04ca';     /* stamp-assets.py 가 ?v= 를 붙인다 */
+var PDFDECK = 'pdfdeck.js?v=92f365fc4c';     /* stamp-assets.py 가 ?v= 를 붙인다 */
 var PDF = { file: null, key: null, out: null };
 /* 변환 차례 번호. 새 PDF 를 고르거나 취소하면 올라가서, 돌고 있던 변환은 멈추고 결과를 버린다. */
 var PDFGEN = 0;

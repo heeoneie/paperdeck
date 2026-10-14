@@ -177,7 +177,7 @@ function repeated(pages) {
 
 /* 읽는 순서(쪽 -> 단 -> 위에서 아래)로 줄을 늘어놓는다 */
 function stream(pages) {
-  var rep = repeated(pages), out = [];
+  var rep = repeated(pages), out = [], first = false;
   pages.forEach(function (pg) {
     var ls = [];
     pg.lines.forEach(function (l) {
@@ -187,11 +187,13 @@ function stream(pages) {
       l.c = c; ls.push(l);
     });
     ls.sort(function (a, b) { return a.c - b.c || Math.round(a.y0 / 3) - Math.round(b.y0 / 3) || a.x0 - b.x0; });
-    /* 시험지 제목처럼 머리에만 있는 것: 위쪽 띠에 문제 번호가 있으면 그보다 위의 줄은 버린다 */
+    /* 시험지 제목처럼 머리에만 있는 것: 첫 문제 번호가 나오는 쪽에서만 그 번호보다 위의 줄을 버린다.
+       다른 쪽 위쪽에는 앞 문제의 보기가 이어질 수 있다(반복되는 머리말은 위에서 걸러짐). */
     var tops = ls.filter(function (l) { return ANCHOR.test(l.t); }).map(function (l) { return l.y0; });
-    if (tops.length && Math.min.apply(0, tops) < pg.H * 0.2) {
+    if (tops.length && !first) {
+      first = true;
       var top = Math.min.apply(0, tops);
-      ls = ls.filter(function (l) { return !(l.y1 < top - 1); });
+      if (top < pg.H * 0.2) ls = ls.filter(function (l) { return !(l.y1 < top - 1); });
     }
     out = out.concat(ls);
   });
