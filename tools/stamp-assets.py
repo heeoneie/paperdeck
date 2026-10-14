@@ -13,6 +13,16 @@ def h(name):
     return hashlib.sha256(open(os.path.join(PUB, name), 'rb').read()).hexdigest()[:10]
 
 def main():
+    # app.js 가 필요할 때 불러오는 pdfdeck.js 에도 해시를 붙인다 (app.js 해시보다 먼저)
+    app = os.path.join(PUB, 'app.js')
+    js = open(app, encoding='utf-8').read()
+    v = h('pdfdeck.js')
+    js, n = re.subn(r"var PDFDECK = 'pdfdeck\.js(?:\?v=[0-9a-f]+)?';", "var PDFDECK = 'pdfdeck.js?v=%s';" % v, js)
+    if n != 1:
+        raise SystemExit("app.js 에서 var PDFDECK = 'pdfdeck.js…'; 줄을 찾지 못했습니다 (%d개)" % n)
+    open(app, 'w', encoding='utf-8').write(js)
+    print('  %-10s v=%s' % ('pdfdeck.js', v))
+
     idx = os.path.join(PUB, 'index.html')
     s = open(idx, encoding='utf-8').read()
     for name, pat in (('app.css', r'href="app\.css(?:\?v=[0-9a-f]+)?"'),

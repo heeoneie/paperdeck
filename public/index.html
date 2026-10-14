@@ -8,7 +8,7 @@
 <meta name="description" content="문제집을 카드로 바꿔 풀고 채점하는 학습 도구">
 <title>paperdeck</title>
 <script>try{var t=localStorage.getItem('pd_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-t',t)}catch(e){}</script>
-<link rel="stylesheet" href="app.css?v=7bbd91725c">
+<link rel="stylesheet" href="app.css?v=6e24f26195">
 </head><body>
 
 <div class="top" id="top" style="display:none">
@@ -27,16 +27,34 @@
   <div class="clist" id="lib"></div>
   <div class="drop" id="drop" style="display:none">
     <b>파일에서 문제집 추가</b>
-    <span>paperdeck 데이터 (.json) 를 여기에 놓거나 눌러서 고르세요</span>
+    <span>문제집 PDF 또는 paperdeck 데이터(.json)를 여기에 놓거나 눌러서 고르세요</span>
   </div>
-  <input type="file" id="file" accept="application/json,.json" hidden>
+  <input type="file" id="file" accept="application/pdf,.pdf,application/json,.json" hidden>
+  <input type="file" id="kfile" accept="application/pdf,.pdf" hidden>
   <div id="lstat"></div>
+  <!-- PDF 에서 문제집 만들기: 변환은 이 기기 안에서만 -->
+  <div class="panel" id="pdfp" hidden>
+    <div class="pname" id="pname"></div>
+    <div class="prow"><label for="pt">제목</label><div class="pctl"><input class="pin" id="pt" autocomplete="off"></div></div>
+    <div class="prow"><label for="pr">회차</label><div class="pctl"><input class="pin" id="pr" autocomplete="off" placeholder="예: 2026년 2회 (없으면 비워 두세요)"></div></div>
+    <div class="prow"><label>정답표</label><div class="pctl pkey">
+      <button class="fixbtn" id="pkbtn" type="button">정답표 PDF 고르기</button><span id="pkname"></span>
+    </div></div>
+    <div class="prow" id="pkmrow" hidden><label for="pkm">과목</label><div class="pctl"><input class="pin" id="pkm" autocomplete="off" placeholder="정답표에 과목이 여럿이면 과목명 (예: 한국사)"></div></div>
+    <label class="chk"><input type="checkbox" id="pimg"> 모든 문제를 원본 그대로 그림으로 넣기</label>
+    <div class="note" style="margin:8px 0 12px">2단 시험지는 자동으로 그림으로 넣습니다. PDF 는 이 기기 안에서만 변환되고 어디에도 올라가지 않습니다.</div>
+    <button class="btn pri" id="pgo" type="button">변환하기</button>
+    <button class="btn" id="pcancel" type="button">취소</button>
+    <div id="pstat"></div>
+    <div id="pres"></div>
+  </div>
   <div class="hint" id="lhint" style="display:none">
     <span id="lhint0">이 사이트에는 문제가 들어 있지 않습니다. </span><b>가지고 계신 데이터 파일을 한 번 불러오면</b>
     이 브라우저에 저장되어 다음부터는 바로 열립니다. 여러 문제집을 더해 두고 골라 풀 수 있고,
     진도는 문제집마다 따로 남습니다.<br><br>
-    파일은 <code>{ "items": [...], "media": {...} }</code> 형태의 JSON입니다.
-    문제집 PDF에서 만드는 방법은 저장소의 <code>tools/pdf2deck.py</code> 를 보세요.<br><br>
+    <b>문제집 PDF</b>를 고르면 이 기기 안에서 문제집으로 바꿉니다. 문제 번호가 <code>1.</code> 꼴이고
+    보기가 <code>①</code> 로 시작하는 객관식 문제집이면 되고, 정답표가 따로 있으면 함께 고르세요.
+    paperdeck 데이터(<code>.json</code>)도 바로 불러올 수 있습니다.<br><br>
     불러온 데이터와 진도는 <b>이 기기의 브라우저에만</b> 저장되며 서버로 전송되지 않습니다.
   </div>
   <button class="btn" id="lback" style="display:none">돌아가기<small>지금 문제집을 그대로 씁니다</small></button>
@@ -129,5 +147,5 @@
   </div>
 </div>
 
-<script src="app.js?v=6e1bb5c977"></script>
+<script src="app.js?v=43e380d48c"></script>
 </body></html>
