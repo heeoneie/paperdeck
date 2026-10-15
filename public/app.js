@@ -953,19 +953,25 @@ function slugId(s) {
 
 /* 예전 진도(pd_prog)를 문제집별 진도에 합친다. 같은 문제는 나중에 푼 기록이 이긴다.
    진도 키는 문제집마다 달라서(전기기사: 제목|회차|쪽) 여러 문제집에 합쳐도 섞이지 않는다.
-   예전 앱을 띄운 채로 둔 탭이 배포 뒤에도 pd_prog 에 쓸 수 있어 부팅 때마다 확인한다. */
+   예전 앱을 띄운 채로 둔 탭이 배포 뒤에도 pd_prog 에 쓸 수 있어 부팅 때마다 확인한다.
+   pd_prog 는 지우지 않는다 — 예전 버전으로 되돌려도 진도가 그대로 보이게.
+   대신 이미 합친 기록(pd_prog_seen 시각까지)은 다시 합치지 않는다 — 진도 초기화가 되살아나지 않게. */
 function mergeLegacyProg(ids) {
   try {
     var old = JSON.parse(localStorage.getItem('pd_prog') || 'null');
     if (!old) return;
+    var seen = +localStorage.getItem('pd_prog_seen') || 0, top = seen;
+    var fresh = Object.keys(old).filter(function (q) { return (old[q].last || 0) > seen; });
+    if (!fresh.length) return;
     ids.forEach(function (id) {
       var k = 'pd_prog:' + id, cur = JSON.parse(localStorage.getItem(k) || '{}');
-      Object.keys(old).forEach(function (q) {
+      fresh.forEach(function (q) {
         if (!cur[q] || (old[q].last || 0) > (cur[q].last || 0)) cur[q] = old[q];
       });
       localStorage.setItem(k, JSON.stringify(cur));
     });
-    localStorage.removeItem('pd_prog');
+    fresh.forEach(function (q) { top = Math.max(top, old[q].last || 0); });
+    localStorage.setItem('pd_prog_seen', String(top));
   } catch (e) {}
 }
 
