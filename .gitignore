@@ -20,3 +20,6 @@ venv/
 .vercel
 node_modules/
 .env*
+
+# 시험 세트 채점 결과
+corpus/results/
