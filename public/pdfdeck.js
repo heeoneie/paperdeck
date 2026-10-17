@@ -210,18 +210,43 @@ function stream(pages) {
   return out;
 }
 
-/* 문제 번호 줄. 번호가 앞 번호보다 크고(빠진 번호는 몇 개까지) 단의 글줄 왼쪽 끝 가까이에 있어야 한다. */
+/* 문제 번호 줄 -> [줄 위치, 번호, 구역]. 번호가 앞 번호보다 크고(빠진 번호는 몇 개까지)
+   단의 글줄 왼쪽 끝 가까이에 있어야 한다. 번호가 앞으로 돌아가고 뒤에 n+1, n+2 가 곧 이어지면
+   새 구역이다 — 선택 과목(국어 35번~, 수학 23번~)이나 같은 시험지의 다른 형(홀수형·짝수형). */
 function anchors(lines, pages) {
-  var last = 0, out = [];
+  var cand = [];
   lines.forEach(function (l, i) {
     var m = ANCHOR.exec(l.t);
     if (!m) return;
     /* 번호는 글줄 시작에 붙어 있다 — 글자 한 자 넘게 들여 쓴 '1.' 은 지문 속 목록 */
-    var n = +m[1], pg = pages[l.pi];
-    if (l.x0 - colEdge(pg, l.c) > (l.y1 - l.y0) * 0.9) return;
-    if (n > last && n <= last + 6) { out.push([i, n]); last = n; }
+    if (l.x0 - colEdge(pages[l.pi], l.c) > (l.y1 - l.y0) * 0.9) return;
+    cand.push([i, +m[1]]);
+  });
+  function follows(k) {
+    var want = cand[k][1] + 1, got = 0;
+    for (var q = k + 1; q < Math.min(cand.length, k + 6) && got < 2; q++) if (cand[q][1] === want) { want++; got++; }
+    return got >= 2;
+  }
+  var last = 0, sec = 0, out = [];
+  cand.forEach(function (c, k) {
+    var n = c[1];
+    if (n > last && n <= last + 6) { out.push([c[0], n, sec]); last = n; }
+    else if (n <= last && out.length >= 3 && follows(k)) { sec++; out.push([c[0], n, sec]); last = n; }
   });
   return out;
+}
+
+/* 앞 구역과 같은 문제로 시작하는 구역(홀수형 뒤의 짝수형 등) — 첫 몇 문제의 첫 줄이 대부분 앞에 이미 있으면 */
+function dupSections(lines, anc) {
+  var seen = {}, dup = {}, bySec = {};
+  anc.forEach(function (a) { (bySec[a[2]] = bySec[a[2]] || []).push(a); });
+  Object.keys(bySec).map(Number).sort(function (x, y) { return x - y; }).forEach(function (sc) {
+    var stems = bySec[sc].map(function (a) { return lines[a[0]].t.replace(ANCHOR, '$2').replace(/\s+/g, ''); });
+    var head = stems.slice(0, 5), hit = head.filter(function (t) { return t.length >= 4 && seen[t]; }).length;
+    if (sc > 0 && hit >= Math.ceil(head.length * 0.6)) { dup[sc] = 1; return; }
+    stems.forEach(function (t) { seen[t] = 1; });
+  });
+  return dup;
 }
 
 function splitChoices(lines) {
@@ -435,9 +460,11 @@ async function readKey(file, match, progress) {
   } finally { doc.closeAll(); }
   var pick = texts.filter(function (t) { return !match || t.indexOf(match) >= 0; });
   if (!pick.length) throw new Error('정답표에서 "' + match + '" 가 들어 있는 쪽을 찾지 못했습니다.');
+  /* 같은 번호가 여러 번이면(선택 과목마다 한 열) 나온 순서대로 모은다 — 표를 가로로 읽든 세로로 읽든
+     같은 번호끼리는 왼쪽 열이 먼저라 시험지의 과목 순서와 같다 */
   var toks = pick[0].match(/[①-⑩]+|\d+/g) || [], key = {};
   for (var j = 0; j < toks.length - 1; j++) {
-    if (/^\d/.test(toks[j]) && CIRC.indexOf(toks[j + 1][0]) >= 0) { key[+toks[j]] = circDigits(toks[j + 1]); j++; }
+    if (/^\d/.test(toks[j]) && CIRC.indexOf(toks[j + 1][0]) >= 0) { (key[+toks[j]] = key[+toks[j]] || []).push(circDigits(toks[j + 1])); j++; }
   }
   return { key: key, pages: pick.length };
 }
@@ -468,25 +495,39 @@ async function run(doc, file, opt, progress, cancelled) {
   if (opt.key) {
     var k = await readKey(opt.key, opt.keyMatch, progress);
     key = k.key;
-    if (k.pages > 1) warn.push('정답표에서 해당하는 쪽이 ' + k.pages + '개라 첫 쪽만 썼습니다' + (opt.keyMatch ? '' : ' — 과목명을 넣어 보세요'));
+    if (k.pages > 1) warn.push('정답표에 해당하는 쪽이 ' + k.pages + '개라 첫 쪽만 썼습니다' + (opt.keyMatch ? '' : ' — 과목이 여럿인 정답표면 과목명을 넣어 보세요'));
   }
   var round = (opt.round || '').trim(), ym = /(\d{4})\s*년/.exec(round);
   var media = new Media('m' + (await hash(file.name + file.size + round)).slice(0, 6));
+  var dup = dupSections(lines, anc), spans = {};
+  var dupN = anc.filter(function (a) { return dup[a[2]]; });
+  if (dupN.length) warn.push('같은 문제가 다시 나와(홀수형·짝수형 등) ' + (lines[dupN[0][0]].pi + 1) + '쪽부터 ' + dupN.length + '문제는 건너뛰었습니다');
+  /* 구역마다 번호 범위 — 몇 번째로 나온 같은 번호인지 세어 정답표의 몇 번째 답을 쓸지 정한다 */
+  anc.forEach(function (a) {
+    if (dup[a[2]]) return;
+    var sp = spans[a[2]] = spans[a[2]] || [a[1], a[1]];
+    sp[0] = Math.min(sp[0], a[1]); sp[1] = Math.max(sp[1], a[1]);
+  });
   var R = new Renderer(), items = [], skipped = [];
   try {
     for (var a = 0; a < anc.length; a++) {
       if (cancelled()) throw new Error('cancelled');
-      var s = anc[a][0], no = anc[a][1];
+      var s = anc[a][0], no = anc[a][1], sec = anc[a][2];
+      if (dup[sec]) continue;
       var end = a + 1 < anc.length ? anc[a + 1][0] : lines.length;
       var nxt = end < lines.length ? lines[end] : null;
       var r = await buildItem(R, pages, lines.slice(s, end), nxt, no, opt, media, !key);
       if (a % 5 === 4 || a === anc.length - 1) progress('문제 만드는 중 ' + (a + 1) + '/' + anc.length);
       if (!r.it) { skipped.push([no, r.why]); continue; }
       var it = r.it;
-      if (key) it.a = key[no];
+      if (key) {
+        var occ = Object.keys(spans).filter(function (k) { return +k < sec && spans[k][0] <= no && no <= spans[k][1]; }).length;
+        it.a = (key[no] || [])[occ];
+      }
       if (!it.a || !it.a.length) { skipped.push([no, '정답 없음']); continue; }
       if (Math.max.apply(0, it.a) >= it.o.length) { skipped.push([no, '정답 번호가 보기 수보다 큼']); continue; }
-      it.id = (round || file.name.replace(/\.pdf$/i, '')) + '#' + no;
+      /* 첫 구역은 예전과 같은 id — 이미 불러온 문제집의 진도 키가 바뀌지 않게 */
+      it.id = (round || file.name.replace(/\.pdf$/i, '')) + '#' + (sec ? sec + '-' : '') + no;
       it.r = round ? [round] : [];
       it.y = ym ? [ym[1].slice(2)] : [];
       items.push(it);
