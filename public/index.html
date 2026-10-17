@@ -8,7 +8,7 @@
 <meta name="description" content="문제집을 카드로 바꿔 풀고 채점하는 학습 도구">
 <title>paperdeck</title>
 <script>try{var t=localStorage.getItem('pd_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-t',t)}catch(e){}</script>
-<link rel="stylesheet" href="app.css?v=6e24f26195">
+<link rel="stylesheet" href="app.css?v=6ecb6b9c9d">
 </head><body>
 
 <div class="top" id="top" style="display:none">
@@ -119,6 +119,10 @@
       <button data-s="a">가나다순</button>
     </div>
   </div>
+  <div class="prow" id="frange" style="display:none">
+    <label>연도</label>
+    <div class="pctl"><select id="fy1"></select><span class="tilde">~</span><select id="fy2"></select></div>
+  </div>
   <div class="clist" id="clist"></div>
   <div style="height:30px"></div>
 </div></div>
@@ -147,5 +151,5 @@
   </div>
 </div>
 
-<script src="app.js?v=bc4e8dad16"></script>
+<script src="app.js?v=7534fb7ce2"></script>
 </body></html>
