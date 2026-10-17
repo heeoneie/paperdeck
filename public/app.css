@@ -253,3 +253,10 @@ img.qimg{background:#fff;border-radius:6px}
 .pwarn{font-size:13px;color:var(--rd);line-height:1.7;margin:6px 0}
 .plist{font-size:12.5px;color:var(--am);margin:4px 0 12px;padding-left:18px;line-height:1.7}
 #pres .citem{border:1px solid var(--line)}
+/* 보관함 ☆ */
+.star{display:block;margin:12px 0 0 auto;background:none;border:1px solid var(--line);border-radius:6px;
+  color:var(--dim);font-size:12px;padding:4px 10px;cursor:pointer}
+.star.on{color:var(--am);border-color:var(--am);background:var(--ambg)}
+.tstar{background:none;border:0;color:var(--dim);font-size:22px;padding:2px 6px;cursor:pointer;line-height:1}
+.tstar.on,.rlist .star.on{color:var(--am)}
+.rlist .star{flex:none;margin:0 0 0 auto;border:0;padding:0 2px;font-size:17px;background:none;line-height:1.2}
