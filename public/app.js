@@ -269,12 +269,44 @@ function concepts() {
   });
 }
 
-/* 같은 문제가 몇 번 출제됐는지(회차 수)로 묶는다. 많이 나온 묶음이 앞으로,
-   묶음 안에서는 최근에 나온 문제가 앞으로. */
-function latest(it) { return it.r.slice().sort().reverse()[0] || ''; }
+/* 빈출순 연도 범위. fy1~fy2 는 두 자리 연도('22'), 비어 있으면 끝까지. */
+var FK = 'pd_frange';
+var FR = { fy1: '', fy2: '' };
+try { Object.assign(FR, JSON.parse(localStorage.getItem(FK) || '{}')); } catch (e) {}
+function frSave() { try { localStorage.setItem(FK, JSON.stringify(FR)); } catch (e) {} }
+/* 회차 이름에 연도가 있는 연도들, 오래된 것부터 */
+function freqYears() {
+  var ys = {};
+  IT.forEach(function (it) { it.r.forEach(function (r) { var y = ryear(r); if (y) ys[y] = 1; }); });
+  return Object.keys(ys).sort();
+}
+function frBounds() {
+  var ys = freqYears();
+  var lo = ys.indexOf(FR.fy1) >= 0 ? FR.fy1 : ys[0] || '';
+  var hi = ys.indexOf(FR.fy2) >= 0 ? FR.fy2 : ys[ys.length - 1] || '';
+  return lo <= hi ? [lo, hi] : [hi, lo];
+}
+function frAll() {
+  var ys = freqYears(), b = frBounds();
+  return !ys.length || (b[0] === ys[0] && b[1] === ys[ys.length - 1]);
+}
+function frLabel() { var b = frBounds(); return b[0] === b[1] ? '20' + b[0] : '20' + b[0] + '~20' + b[1]; }
+/* 범위 안에서 나온 회차들. 연도를 모르는 회차는 범위 전체일 때만 센다. */
+function frRounds(it) {
+  if (frAll()) return it.r;
+  var b = frBounds();
+  return it.r.filter(function (r) { var y = ryear(r); return y && y >= b[0] && y <= b[1]; });
+}
+
+/* 같은 문제가 몇 번 출제됐는지(범위 안 회차 수)로 묶는다. 많이 나온 묶음이 앞으로,
+   묶음 안에서는 최근에 나온 문제가 앞으로. 범위 안에서 안 나온 문제는 빠진다. */
+function latest(it) { return frRounds(it).slice().sort().reverse()[0] || ''; }
 function freqs() {
   var g = {};
-  IT.forEach(function (it) { (g[it.r.length] = g[it.r.length] || []).push(it); });
+  IT.forEach(function (it) {
+    var n = frRounds(it).length;
+    if (n) (g[n] = g[n] || []).push(it);
+  });
   return Object.keys(g).map(Number).sort(function (a, b) { return b - a; }).map(function (k) {
     var list = g[k].slice().sort(function (a, b) {
       return latest(b).localeCompare(latest(a)) || (a.p - b.p);
@@ -315,6 +347,7 @@ function paintBrowse() {
   var byConcept = CS.mode === 'c';
   $('#csearch').style.display = byConcept ? '' : 'none';
   $('#csortrow').style.display = byConcept ? '' : 'none';
+  if (CS.mode !== 'f') $('#frange').style.display = 'none';
   if (CS.mode === 'y') paintYears();
   else if (CS.mode === 'g') paintSets();
   else if (CS.mode === 'f') paintFreqs();
@@ -335,10 +368,22 @@ function paintSets() {
   });
 }
 
+function paintFreqRange() {
+  var ys = freqYears(), b = frBounds();
+  $('#frange').style.display = ys.length > 1 ? '' : 'none';
+  ['#fy1', '#fy2'].forEach(function (sel, i) {
+    $(sel).innerHTML = ys.map(function (y) {
+      return '<option value="' + y + '"' + (y === b[i] ? ' selected' : '') + '>20' + y + '</option>';
+    }).join('');
+  });
+}
+
 function paintFreqs() {
+  paintFreqRange();
   var all = freqs();
-  var rep = IT.filter(function (it) { return it.r.length > 1; }).length;
-  $('#csub').textContent = '문제 ' + IT.length + '개 · 두 번 이상 나온 문제 ' + rep +
+  var n = all.reduce(function (s, o) { return s + o.list.length; }, 0);
+  var rep = all.reduce(function (s, o) { return s + (o.k > 1 ? o.list.length : 0); }, 0);
+  $('#csub').textContent = (frAll() ? '' : frLabel() + ' · ') + '문제 ' + n + '개 · 두 번 이상 나온 문제 ' + rep +
                            '개 · 같은 문제가 출제된 횟수 기준, 답이 다 보입니다';
   $('#clist').innerHTML = all.map(function (o) {
     var ys = o.list.map(function (it) { return ryear(latest(it)); }).sort();
@@ -465,7 +510,8 @@ function openFreq(k) {
   var o = freqs().filter(function (x) { return x.k === k; })[0];
   if (!o) return;
   var h = ['<div class="chead"><h1>' + k + '회 출제된 문제</h1>' +
-           '<div class="sub1">' + o.list.length + '문제 · 최근 출제순 · 답이 다 보입니다</div></div>',
+           '<div class="sub1">' + (frAll() ? '' : frLabel() + ' · ') +
+           o.list.length + '문제 · 최근 출제순 · 답이 다 보입니다</div></div>',
            '<button class="btn pri" id="fgo">이 ' + o.list.length + '문제 풀기' +
            '<small>답을 가리고 채점합니다</small></button>'];
 
@@ -482,8 +528,9 @@ function openFreq(k) {
            (k > 1 ? '<span>' + k + '회 출제</span>' : '') + '</div>');
     h.push('<div class="citem" id="f' + i + '"><div class="cnum">' + (i + 1) + '</div>' +
            renderSolved(it) +
-           (k > 1 ? '<div class="note" style="margin:10px 0 0">출제: ' +
-             esc(it.r.join(' · ')) + '</div>' : '') + '</div>');
+           (k > 1 || it.r.length > k ? '<div class="note" style="margin:10px 0 0">출제: ' +
+             esc(frRounds(it).join(' · ')) +
+             (it.r.length > k ? ' (범위 밖 포함 전체 ' + it.r.length + '회)' : '') + '</div>' : '') + '</div>');
   });
   $('#cdetail').innerHTML = h.join('');
   wireJumps();
@@ -776,8 +823,9 @@ function home(pop) {
   $('#bc').disabled = !u.length;
   /* 빈출순은 여러 회차에 반복 출제된 문제가 있을 때만 의미가 있다 */
   $('#bf').style.display = hasRepeats() ? '' : 'none';
-  $('#bf').innerHTML = '빈출순으로 풀기<small>많이 나온 문제부터 · ' +
-    (u.length ? '안 푼 ' + u.length + '문제' : '전부 풀어서 처음부터 ' + IT.length + '문제') + '</small>';
+  var fa = byFreq(), fu = fa.filter(function (it) { return !prog[key(it)]; });
+  $('#bf').innerHTML = '빈출순으로 풀기<small>많이 나온 문제부터 · ' + (frAll() ? '' : frLabel() + ' · ') +
+    (fu.length ? '안 푼 ' + fu.length + '문제' : '전부 풀어서 처음부터 ' + fa.length + '문제') + '</small>';
   var all = sets();
   $('#yrsec').textContent = setsName();
   $('#yr').classList.toggle('wide', !hasYears());
@@ -838,12 +886,15 @@ $$('#csort button').forEach(function (b) {
     paintConcepts();
   };
 });
+['#fy1', '#fy2'].forEach(function (sel, i) {
+  $(sel).onchange = function () { FR[i ? 'fy2' : 'fy1'] = this.value; frSave(); paintFreqs(); };
+});
 $('#bw').onclick = function () { startSession(shuffle(wrongList()), '오답'); };
 $('#bc').onclick = function () { startSession(unseen(), '이어서'); };
 /* 안 푼 문제를 많이 나온 것부터. 다 풀었으면 전체를 처음부터. */
 $('#bf').onclick = function () {
   var all = byFreq(), left = all.filter(function (it) { return !prog[key(it)]; });
-  startSession(left.length ? left : all, '빈출순');
+  startSession(left.length ? left : all, '빈출순' + (frAll() ? '' : ' ' + frLabel()));
 };
 /* ---------- 랜덤 설정 ---------- */
 var RK = 'pd_rnd';
