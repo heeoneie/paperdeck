@@ -331,6 +331,41 @@ function byFreq() {
   return freqs().reduce(function (a, o) { return a.concat(o.list); }, []);
 }
 
+/* ---------- 보관함: 안 외워지는 문제를 ☆ 로 모아 두고 다시 본다 ----------
+   문제집마다 'pd_star:<id>' 에 { 문제키: 담은 시각 }. 진도 초기화와는 따로 남는다. */
+var STAR = {};
+function stLoad() {
+  try { STAR = JSON.parse(localStorage.getItem('pd_star:' + CUR) || '{}'); } catch (e) { STAR = {}; }
+}
+function stSave() { if (!CUR) return; try { localStorage.setItem('pd_star:' + CUR, JSON.stringify(STAR)); } catch (e) {} }
+function starred(it) { return !!STAR[key(it)]; }
+function stToggle(it) {
+  var k = key(it);
+  if (STAR[k]) delete STAR[k]; else STAR[k] = Date.now();
+  stSave();
+  return !!STAR[k];
+}
+/* 최근에 담은 것부터 */
+function starList() {
+  return IT.filter(starred).sort(function (a, b) { return STAR[key(b)] - STAR[key(a)]; });
+}
+function starText(on) { return on ? '★ 보관함에 있음' : '☆ 보관함에 담기'; }
+/* 버튼은 list[i] 의 문제를 담고 뺀다 — 그린 뒤 wireStars(root, list) */
+function starHtml(it, i) {
+  var on = starred(it);
+  return '<button class="star' + (on ? ' on' : '') + '" type="button" data-sv="' + i + '">' + starText(on) + '</button>';
+}
+function wireStars(root, list, short) {
+  $$('.star[data-sv]', root).forEach(function (b) {
+    b.onclick = function (ev) {
+      ev.stopPropagation();
+      var on = stToggle(list[+b.dataset.sv]);
+      b.classList.toggle('on', on);
+      b.textContent = short ? (on ? '★' : '☆') : starText(on);
+    };
+  });
+}
+
 /* 이 문제집에서 쓸 수 있는 보기 방식. 제목이 거의 다 다르면 개념별은 의미가 없다. */
 function browseModes() {
   var m = [];
@@ -338,6 +373,7 @@ function browseModes() {
   /* 객관식의 제목은 문제 첫머리라 개념으로 묶을 수 없다 */
   if (!IT.every(isMC) && concepts().length <= IT.length * 0.85) m.push(['c', '개념별']);
   if (hasRepeats()) m.push(['f', '빈출순']);
+  if (starList().length) m.push(['s', '보관함']);
   return m;
 }
 
@@ -362,6 +398,7 @@ function paintBrowse() {
   if (CS.mode === 'y') paintYears();
   else if (CS.mode === 'g') paintSets();
   else if (CS.mode === 'f') paintFreqs();
+  else if (CS.mode === 's') paintStars();
   else paintConcepts();
 }
 
@@ -427,6 +464,18 @@ function paintYears() {
   });
 }
 
+function paintStars() {
+  var all = starList();
+  $('#csub').textContent = '보관함 ' + all.length + '문제 · 최근에 담은 것부터 · 답이 다 보입니다';
+  $('#clist').innerHTML = all.map(function (it, i) {
+    return '<div class="crow" data-i="' + i + '"><span class="cname">' + esc(shortTitle(it)) + '</span>' +
+           '<span class="cmeta">' + esc(it.r[0] || '') + '</span></div>';
+  }).join('');
+  $$('#clist .crow').forEach(function (r) {
+    r.onclick = function () { openStars('s' + r.dataset.i); };
+  });
+}
+
 function paintConcepts() {
   var all = concepts();
   $('#csub').textContent = '개념 ' + all.length + '개 · 문제 ' + IT.length +
@@ -479,6 +528,7 @@ function openYear(y) {
       }).join('') + '</span></div>';
   }).join('') + '</div>');
 
+  var vis = [];
   o.rounds.forEach(function (rd, ri) {
     h.push('<div class="cyear"><b>' + esc(rd.r) + '</b><i></i>' +
            '<span>' + rd.list.length + '문제</span></div>');
@@ -487,11 +537,12 @@ function openYear(y) {
       h.push('<div class="citem" id="q' + ri + '_' + i + '"><div class="cnum">' + (it.no || i + 1) + '</div>' +
              renderSolved(it) +
              (other.length ? '<div class="note" style="margin:10px 0 0">같은 문제: ' +
-               esc(other.join(' · ')) + '</div>' : '') + '</div>');
+               esc(other.join(' · ')) + '</div>' : '') + starHtml(it, vis.push(it) - 1) + '</div>');
     });
   });
   $('#cdetail').innerHTML = h.join('');
   wireJumps();
+  wireStars($('#cdetail'), vis);
   $('#tt').textContent = '20' + y + '년';
   $('#ts').textContent = o.n + '문제 · ' + o.rounds.length + '개 회차';
   $('#pbar').style.width = '100%';
@@ -506,9 +557,10 @@ function openSet(o) {
            '<small>답을 가리고 채점합니다</small></button>'];
   o.list.forEach(function (it, i) {
     h.push('<div class="citem"><div class="cnum">' + (it.no || i + 1) + '</div>' +
-           renderSolved(it) + '</div>');
+           renderSolved(it) + starHtml(it, i) + '</div>');
   });
   $('#cdetail').innerHTML = h.join('');
+  wireStars($('#cdetail'), o.list);
   $('#fgo').onclick = function () { startSession(o.list, o.label); };
   $('#tt').textContent = o.label;
   $('#ts').textContent = o.list.length + '문제';
@@ -541,10 +593,12 @@ function openFreq(k) {
            renderSolved(it) +
            (k > 1 || it.r.length > k ? '<div class="note" style="margin:10px 0 0">출제: ' +
              esc(frRounds(it).join(' · ')) +
-             (it.r.length > k ? ' (범위 밖 포함 전체 ' + it.r.length + '회)' : '') + '</div>' : '') + '</div>');
+             (it.r.length > k ? ' (범위 밖 포함 전체 ' + it.r.length + '회)' : '') + '</div>' : '') +
+           starHtml(it, i) + '</div>');
   });
   $('#cdetail').innerHTML = h.join('');
   wireJumps();
+  wireStars($('#cdetail'), o.list);
   $('#fgo').onclick = function () { startSession(o.list, k + '회 출제'); };
   $('#tt').textContent = k + '회 출제';
   $('#ts').textContent = '빈출순 · ' + o.list.length + '문제';
@@ -560,19 +614,46 @@ function openConcept(title) {
 
   var h = ['<div class="chead"><h1>◇ ' + esc(title) + '</h1>' +
            '<div class="sub1">' + list.length + '문제 · 답이 다 보입니다</div></div>'];
-  list.forEach(function (it) {
+  list.forEach(function (it, i) {
     h.push('<div class="cyear"><b>' + esc(it.r[0] || '') + '</b><i></i>' +
            (it.r.length > 1 ? '<span>같은 문제 ' + it.r.length + '회 출제</span>' : '') +
            '</div>');
     h.push('<div class="citem">' + renderSolved(it) +
            (it.r.length > 1 ? '<div class="note" style="margin:10px 0 0">출제: ' +
-             esc(it.r.join(' · ')) + '</div>' : '') + '</div>');
+             esc(it.r.join(' · ')) + '</div>' : '') + starHtml(it, i) + '</div>');
   });
   $('#cdetail').innerHTML = h.join('');
+  wireStars($('#cdetail'), list);
   $('#tt').textContent = title;
   $('#ts').textContent = '개념 · ' + list.length + '문제';
   $('#pbar').style.width = '100%';
   show('concept');
+}
+
+/* 보관함 — 담은 문제를 답과 함께. jump 가 있으면 그 문제로 내려간다. */
+function openStars(jump) {
+  var list = starList();
+  if (!list.length) return;
+  var h = ['<div class="chead"><h1>보관함</h1>' +
+           '<div class="sub1">' + list.length + '문제 · 최근에 담은 것부터 · 답이 다 보입니다. ' +
+           '외웠으면 ★ 를 눌러 빼세요</div></div>',
+           '<button class="btn pri" id="fgo">이 ' + list.length + '문제 풀기' +
+           '<small>섞어서 답을 가리고 채점합니다</small></button>'];
+  list.forEach(function (it, i) {
+    h.push('<div class="cyear"><b>' + esc(it.r.join(' · ')) + '</b><i></i></div>');
+    h.push('<div class="citem" id="s' + i + '">' + (isMC(it) && it.no ? '<div class="cnum">' + it.no + '</div>' : '') +
+           renderSolved(it) + starHtml(it, i) + '</div>');
+  });
+  $('#cdetail').innerHTML = h.join('');
+  wireStars($('#cdetail'), list);
+  /* 보는 중에 뺀 문제는 풀기에서도 뺀다 */
+  $('#fgo').onclick = function () { startSession(shuffle(list.filter(starred)), '보관함'); };
+  $('#tt').textContent = '보관함';
+  $('#ts').textContent = list.length + '문제';
+  $('#pbar').style.width = '100%';
+  show('concept');
+  var el = jump && document.getElementById(jump);
+  if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.pageYOffset - 56);
 }
 
 /* ---------- 상태 ---------- */
@@ -590,7 +671,12 @@ var goTo = null;      /* 그때 실제로 띄운 화면. 돌아간 히스토리 
 function navTo(n) {
   var d = DEPTH[n], cur = history.state, d0 = cur && cur.d || 0;
   try {
-    if (d > d0) history.pushState({ s: n, d: d }, '');
+    if (d > d0) {
+      /* 홈에서 바로 상세(보관함)로 가듯 두 칸을 건너뛰면 사이 칸을 지금 화면으로 채운다 —
+         나중에 history.go 로 한 칸씩 돌아올 때 사이트 밖으로 나가지 않게 */
+      for (var i = d0 + 1; i < d; i++) history.pushState({ s: cur && cur.s || 'home', d: i }, '');
+      history.pushState({ s: n, d: d }, '');
+    }
     else if (d === d0) history.replaceState({ s: n, d: d }, '');
     else { progGo = true; goTo = { s: n, d: d }; history.go(d - d0); }
   } catch (e) {}
@@ -602,6 +688,7 @@ function show(n, pop) {
   var bare = (n === 'home' || n === 'load' || n === 'concepts');
   $('#top').style.display = bare ? 'none' : '';
   $('#bot').style.display = (n === 'study') ? '' : 'none';
+  $('#tstar').hidden = n !== 'study';
   if (n === 'done') {
     $('#tt').textContent = '결과';
     $('#ts').textContent = S.label + ' · ' + S.list.length + '문제';
@@ -621,6 +708,7 @@ function paint() {
                          (it.r.length ? ' · ' + it.r.join(', ') : '');
   $('#pbar').style.width = (S.pos / S.list.length * 100) + '%';
   $('#q').innerHTML = renderQ(it);
+  paintTstar();
   $('#act').textContent = '채점하기';
   $('#skip').style.display = '';
   $('#res').textContent = '';
@@ -646,6 +734,13 @@ function paint() {
       }
     });
   });
+}
+
+function paintTstar() {
+  var on = starred(S.list[S.pos]), b = $('#tstar');
+  b.textContent = on ? '★' : '☆';
+  b.classList.toggle('on', on);
+  b.setAttribute('aria-label', on ? '보관함에서 빼기' : '보관함에 담기');
 }
 
 function revealImg(k) {
@@ -786,7 +881,7 @@ function next() {
 
 function finish() {
   var ok = 0, rows = '';
-  S.list.forEach(function (it) {
+  S.list.forEach(function (it, i) {
     var p = prog[key(it)];
     var good = p && p.ok;
     if (good) ok++;
@@ -794,12 +889,14 @@ function finish() {
             '<span class="tag">' + (isMC(it) && it.no ? it.no + '번' : 'p' + it.p) + '</span>' +
             esc(it.t) +
             (!isMC(it) && p && p.rate != null ? ' <span style="color:var(--dim)">' + p.rate + '%</span>' : '') +
-            '</span></div>';
+            '</span><button class="star' + (starred(it) ? ' on' : '') + '" type="button" data-sv="' + i + '"' +
+            ' aria-label="보관함">' + (starred(it) ? '★' : '☆') + '</button></div>';
   });
   $('#big').textContent = Math.round(ok / S.list.length * 100) + '%';
   $('#bigsub').textContent = S.list.length + '문제 중 ' + ok + '문제 ' +
                              (S.list.some(function (it) { return !isMC(it); }) ? '전부 정답' : '정답');
   $('#rlist').innerHTML = rows;
+  wireStars($('#rlist'), S.list, true);
   show('done');
 }
 function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
@@ -832,6 +929,10 @@ function home(pop) {
   $('#bw').disabled = !w.length;
   $('#bc').innerHTML = '이어서 풀기<small>' + (u.length ? '안 푼 ' + u.length + '문제' : '전부 풀었습니다') + '</small>';
   $('#bc').disabled = !u.length;
+  var st = starList();
+  $('#bs').innerHTML = '보관함<small>' + (st.length ? st.length + '문제 · 답 보기와 다시 풀기' :
+    '비어 있음 · 풀다가 ☆ 를 눌러 안 외워지는 문제를 담으세요') + '</small>';
+  $('#bs').disabled = !st.length;
   /* 빈출순은 여러 회차에 반복 출제된 문제가 있을 때만 의미가 있다 */
   $('#bf').style.display = hasRepeats() ? '' : 'none';
   var fa = byFreq(), fu = fa.filter(function (it) { return !prog[key(it)]; });
@@ -900,6 +1001,8 @@ $$('#csort button').forEach(function (b) {
 ['#fy1', '#fy2'].forEach(function (sel, i) {
   $(sel).onchange = function () { FR[i ? 'fy2' : 'fy1'] = this.value; frSave(); paintFreqs(); };
 });
+$('#bs').onclick = function () { openStars(); };
+$('#tstar').onclick = function () { stToggle(S.list[S.pos]); paintTstar(); };
 $('#bw').onclick = function () { startSession(shuffle(wrongList()), '오답'); };
 $('#bc').onclick = function () { startSession(unseen(), '이어서'); };
 /* 안 푼 문제를 많이 나온 것부터. 다 풀었으면 전체를 처음부터. */
@@ -1088,6 +1191,7 @@ function activate(d) {
   PK = 'pd_prog:' + CUR;
   loadProg();
   frLoad();
+  stLoad();
   if (changed) {
     S = { list: [], pos: 0, graded: false, marks: {}, label: '' };
     $('#cdetail').innerHTML = '';
@@ -1199,7 +1303,8 @@ function removeDeck(id) {
   var m = libGet(id);
   if (!m || !confirm('"' + (m.title || id) + '" 문제집과 그 진도 기록을 이 기기에서 지웁니다.')) return;
   idbDel(dsKey(id)).then(function () {
-    try { localStorage.removeItem('pd_prog:' + id); localStorage.removeItem('pd_frange:' + id); } catch (e) {}
+    try { localStorage.removeItem('pd_prog:' + id); localStorage.removeItem('pd_frange:' + id);
+          localStorage.removeItem('pd_star:' + id); } catch (e) {}
     LIB = LIB.filter(function (x) { return x.id !== id; });
     libSave();
     if (CUR === id) {

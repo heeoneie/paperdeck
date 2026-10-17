@@ -8,13 +8,14 @@
 <meta name="description" content="문제집을 카드로 바꿔 풀고 채점하는 학습 도구">
 <title>paperdeck</title>
 <script>try{var t=localStorage.getItem('pd_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-t',t)}catch(e){}</script>
-<link rel="stylesheet" href="app.css?v=6ecb6b9c9d">
+<link rel="stylesheet" href="app.css?v=ee52b504bd">
 </head><body>
 
 <div class="top" id="top" style="display:none">
   <div class="in">
     <button class="back" id="back" aria-label="뒤로">‹</button>
     <div class="tmeta"><div class="tt" id="tt"></div><div class="ts" id="ts"></div></div>
+    <button class="tstar" id="tstar" type="button" hidden>☆</button>
   </div>
   <div class="bar"><i id="pbar" style="width:0"></i></div>
 </div>
@@ -72,6 +73,7 @@
   <button class="btn pri" id="bc"></button>
   <button class="btn" id="bf"></button>
   <button class="btn" id="bw"></button>
+  <button class="btn" id="bs"></button>
   <button class="btn" id="br">랜덤 문제<small id="brsub">연도 범위와 문항 수를 고릅니다</small></button>
   <div class="panel" id="rnd" hidden>
     <div class="prow" id="rrange">
@@ -151,5 +153,5 @@
   </div>
 </div>
 
-<script src="app.js?v=a0beca7473"></script>
+<script src="app.js?v=d8ae6c00a7"></script>
 </body></html>
