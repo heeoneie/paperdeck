@@ -160,20 +160,51 @@ def stream(pages):
 
 
 def find_anchors(lines, pages):
-    """문제 번호 줄. 번호가 앞 번호보다 크고(빠진 번호는 몇 개까지 허용) 단의 글줄 왼쪽 끝 가까이에 있어야 한다."""
-    last, idx = 0, []
+    """문제 번호 줄 -> [(줄 위치, 번호, 구역)]. 번호가 앞 번호보다 크고(빠진 번호는 몇 개까지 허용)
+    단의 글줄 왼쪽 끝 가까이에 있어야 한다. 번호가 앞으로 돌아가고 뒤에 n+1, n+2 가 곧 이어지면
+    새 구역이다 — 선택 과목(국어 35번~, 수학 23번~)이나 같은 시험지의 다른 형(홀수형·짝수형)."""
+    cand = []
     for i, l in enumerate(lines):
         m = ANCHOR.match(l['t'])
         if not m:
             continue
-        n = int(m.group(1))
-        pg = pages[l['pi']]
         # 번호는 글줄 시작에 붙어 있다 — 글자 한 자 넘게 들여 쓴 '1.' 은 지문 속 목록
-        if l['x0'] - pg.col_edge(l['c']) > (l['y1'] - l['y0']) * 0.9:
+        if l['x0'] - pages[l['pi']].col_edge(l['c']) > (l['y1'] - l['y0']) * 0.9:
             continue
+        cand.append((i, int(m.group(1))))
+
+    def follows(k):
+        want, got = cand[k][1] + 1, 0
+        for q in range(k + 1, min(len(cand), k + 6)):
+            if got >= 2:
+                break
+            if cand[q][1] == want:
+                want += 1; got += 1
+        return got >= 2
+
+    last, sec, idx = 0, 0, []
+    for k, (i, n) in enumerate(cand):
         if last < n <= last + 6:
-            idx.append((i, n)); last = n
+            idx.append((i, n, sec)); last = n
+        elif n <= last and len(idx) >= 3 and follows(k):
+            sec += 1
+            idx.append((i, n, sec)); last = n
     return idx
+
+
+def dup_sections(lines, anchors):
+    """앞 구역과 같은 문제로 시작하는 구역(홀수형 뒤의 짝수형 등) — 첫 몇 문제의 첫 줄이 대부분 앞에 이미 있으면"""
+    seen, dup, by = set(), set(), collections.defaultdict(list)
+    for a in anchors:
+        by[a[2]].append(a)
+    for sc in sorted(by):
+        stems = [re.sub(r'\s+', '', ANCHOR.match(lines[i]['t']).group(2)) for i, _, _ in by[sc]]
+        head = stems[:5]
+        hit = sum(1 for t in head if len(t) >= 4 and t in seen)
+        if sc > 0 and hit >= -(-len(head) * 6 // 10):
+            dup.add(sc); continue
+        seen.update(stems)
+    return dup
 
 
 # ---------------------------------------------------------------- 문제 한 개
@@ -250,6 +281,8 @@ def objects_between(pages, a, b, kind):
     ka = (a['pi'], a['c'], a['y0'] - 2)
     kb = (b['pi'], b['c'], b['y0'] - 2) if b else (10 ** 9, 0, 0)
     for pg in pages[a['pi']:(b['pi'] + 1 if b else len(pages))]:
+        if pg is None:          # --pages 로 고르지 않은 쪽
+            continue
         for o in getattr(pg, kind):
             c = pg.col(o)
             if c < 0:
@@ -361,15 +394,18 @@ def read_key(path, match):
     pages = [p for p in doc if not match or match in p.get_text()]
     if not pages:
         sys.exit('정답표에서 "%s" 가 들어 있는 쪽을 찾지 못했습니다.' % match)
-    if match and len(pages) > 1:
-        print('  ! 정답표에서 "%s" 가 들어 있는 쪽이 %d개 — 첫 쪽만 씁니다.' % (match, len(pages)))
+    if len(pages) > 1:
+        print('  ! 정답표에 해당하는 쪽이 %d개 — 첫 쪽만 씁니다%s.'
+              % (len(pages), '' if match else ' (과목이 여럿이면 --key-match 로 과목명)'))
+    # 같은 번호가 여러 번이면(선택 과목마다 한 열) 나온 순서대로 모은다 — 표를 가로로 읽든 세로로 읽든
+    # 같은 번호끼리는 왼쪽 열이 먼저라 시험지의 과목 순서와 같다
     toks = re.findall(r'[①-⑩]+|\d+', pages[0].get_text())
-    key = {}
+    key = collections.defaultdict(list)
     i = 0
     while i < len(toks) - 1:
         # '①'.isdigit() 도 True 라 isdigit 로 가르면 안 된다
         if toks[i][0] in '0123456789' and toks[i + 1][0] in CIRC:
-            key[int(toks[i])] = circ_digits(toks[i + 1]); i += 2
+            key[int(toks[i])].append(circ_digits(toks[i + 1])); i += 2
         else:
             i += 1
     return key
@@ -411,27 +447,43 @@ def main():
     prefix = 'm' + hashlib.sha1((a.pdf + rnd).encode()).hexdigest()[:6]
     media = Media(prefix)
 
+    dup = dup_sections(lines, anchors)
+    dups = [x for x in anchors if x[2] in dup]
+    if dups:
+        print('  ! 같은 문제가 다시 나와(홀수형·짝수형 등) %d쪽부터 %d문제는 건너뜀' % (lines[dups[0][0]]['pi'] + 1, len(dups)))
+    # 구역마다 번호 범위 — 몇 번째로 나온 같은 번호인지 세어 정답표의 몇 번째 답을 쓸지 정한다
+    spans = {}
+    for _, n, sc in anchors:
+        if sc not in dup:
+            lo, hi = spans.get(sc, (n, n))
+            spans[sc] = (min(lo, n), max(hi, n))
+
     items, skipped = [], []
-    for j, (i, no) in enumerate(anchors):
+    for j, (i, no, sec) in enumerate(anchors):
+        if sec in dup:
+            continue
         end = anchors[j + 1][0] if j + 1 < len(anchors) else len(lines)
         nxt = lines[end] if end < len(lines) else None
         it, why = build_item(doc, pages, lines[i:end], nxt, no, a.mode, media, inline=key is None)
         if not it:
             skipped.append((no, why)); continue
         if key is not None:
-            it['a'] = key.get(no)
+            occ = sum(1 for sc, (lo, hi) in spans.items() if sc < sec and lo <= no <= hi)
+            ans = key.get(no, [])
+            it['a'] = ans[occ] if occ < len(ans) else None
         if not it.get('a'):
             skipped.append((no, '정답 없음')); continue
         if max(it['a']) >= len(it['o']):
             skipped.append((no, '정답 번호가 보기 수보다 큼')); continue
         # 회차만으로는 --append 로 모은 과목끼리 번호가 겹친다 — 파일 이름도 넣는다
         base = os.path.splitext(os.path.basename(a.pdf))[0]
-        it['id'] = '%s#%d' % (rnd + '|' + base if rnd else base, no)
+        # 첫 구역은 예전과 같은 id — 이미 만든 문제집의 진도 키가 바뀌지 않게
+        it['id'] = '%s#%s%d' % (rnd + '|' + base if rnd else base, '%d-' % sec if sec else '', no)
         it['r'] = [rnd] if rnd else []
         it['y'] = [year] if year else []
         items.append(it)
 
-    nums = [n for _, n in anchors]
+    nums = [n for _, n, _ in anchors]
     gaps = [n for n in range(1, (max(nums) if nums else 0) + 1) if n not in set(nums)]
     multi = sum(1 for x in items if len(x['a']) > 1)
     print('  문제 %d개 (복수 정답 %d) · 그림 %d장 · 건너뜀 %d' % (len(items), multi, len(media.data), len(skipped)))
