@@ -1,0 +1,8 @@
+{
+  "name": "paperdeck-score",
+  "private": true,
+  "type": "module",
+  "description": "시험 세트(corpus/)로 앱의 PDF 변환기(public/pdfdeck.js)를 채점한다",
+  "scripts": { "score": "node score.mjs" },
+  "devDependencies": { "playwright-core": "^1.56.0" }
+}
