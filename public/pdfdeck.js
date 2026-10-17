@@ -157,6 +157,16 @@ function colX(pg, c) {
   if (pg.split == null) return [0, pg.W];
   return c === 0 ? [0, pg.split] : [pg.split, pg.W];
 }
+/* 단에서 글줄이 실제로 시작하는 x. 여백 폭은 문서마다 달라 쪽 가장자리로 재면 안 된다.
+   머리말·꼬리말을 뺀 줄들의 왼쪽 끝 중 아래쪽 10% 지점(튀는 줄 몇 개는 무시) */
+function colEdge(pg, c) {
+  pg.edge = pg.edge || {};
+  if (c in pg.edge) return pg.edge[c];
+  var xs = pg.lines.filter(function (l) {
+    return l.y0 > pg.H * 0.1 && l.y1 < pg.H * 0.9 && colOf(pg, l) === c;
+  }).map(function (l) { return l.x0; }).sort(function (a, b) { return a - b; });
+  return (pg.edge[c] = xs.length >= 3 ? xs[Math.floor(xs.length * 0.1)] : colX(pg, c)[0]);
+}
 
 /* 여러 쪽에 같은 자리에 반복되는 줄(쪽 번호·머리말) — 숫자는 무시하고 비교 */
 function repeated(pages) {
@@ -200,14 +210,15 @@ function stream(pages) {
   return out;
 }
 
-/* 문제 번호 줄. 번호가 앞 번호보다 크고(빠진 번호는 몇 개까지) 단 왼쪽 끝에 있어야 한다. */
+/* 문제 번호 줄. 번호가 앞 번호보다 크고(빠진 번호는 몇 개까지) 단의 글줄 왼쪽 끝 가까이에 있어야 한다. */
 function anchors(lines, pages) {
   var last = 0, out = [];
   lines.forEach(function (l, i) {
     var m = ANCHOR.exec(l.t);
     if (!m) return;
-    var n = +m[1], pg = pages[l.pi], cx = colX(pg, l.c);
-    if (l.x0 - cx[0] > (cx[1] - cx[0]) * 0.2) return;
+    /* 번호는 글줄 시작에 붙어 있다 — 글자 한 자 넘게 들여 쓴 '1.' 은 지문 속 목록 */
+    var n = +m[1], pg = pages[l.pi];
+    if (l.x0 - colEdge(pg, l.c) > (l.y1 - l.y0) * 0.9) return;
     if (n > last && n <= last + 6) { out.push([i, n]); last = n; }
   });
   return out;

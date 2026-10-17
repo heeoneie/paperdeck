@@ -81,6 +81,7 @@ class Page:
             r = d['rect']
             self.draws.append(dict(x0=r.x0, y0=r.y0, x1=r.x1, y1=r.y1, pi=pi))
         self.split = self._columns()
+        self._edge = {}
 
     def _columns(self):
         """2단이면 단 경계 x, 1단이면 None"""
@@ -106,6 +107,15 @@ class Page:
         if self.split is None:
             return 0, self.W
         return (0, self.split) if c == 0 else (self.split, self.W)
+
+    def col_edge(self, c):
+        """단에서 글줄이 실제로 시작하는 x. 여백 폭은 문서마다 달라 쪽 가장자리로 재면 안 된다.
+        머리말·꼬리말을 뺀 줄들의 왼쪽 끝 중 아래쪽 10% 지점(튀는 줄 몇 개는 무시)"""
+        if c not in self._edge:
+            xs = sorted(l['x0'] for l in self.lines
+                        if l['y0'] > self.H * 0.1 and l['y1'] < self.H * 0.9 and self.col(l) == c)
+            self._edge[c] = xs[int(len(xs) * 0.1)] if len(xs) >= 3 else self.col_x(c)[0]
+        return self._edge[c]
 
 
 def repeated_lines(pages):
@@ -150,7 +160,7 @@ def stream(pages):
 
 
 def find_anchors(lines, pages):
-    """문제 번호 줄. 번호가 앞 번호보다 크고(빠진 번호는 몇 개까지 허용) 단 왼쪽 끝에 있어야 한다."""
+    """문제 번호 줄. 번호가 앞 번호보다 크고(빠진 번호는 몇 개까지 허용) 단의 글줄 왼쪽 끝 가까이에 있어야 한다."""
     last, idx = 0, []
     for i, l in enumerate(lines):
         m = ANCHOR.match(l['t'])
@@ -158,8 +168,8 @@ def find_anchors(lines, pages):
             continue
         n = int(m.group(1))
         pg = pages[l['pi']]
-        cx0, cx1 = pg.col_x(l['c'])
-        if l['x0'] - cx0 > (cx1 - cx0) * 0.2:
+        # 번호는 글줄 시작에 붙어 있다 — 글자 한 자 넘게 들여 쓴 '1.' 은 지문 속 목록
+        if l['x0'] - pg.col_edge(l['c']) > (l['y1'] - l['y0']) * 0.9:
             continue
         if last < n <= last + 6:
             idx.append((i, n)); last = n
