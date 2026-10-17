@@ -269,11 +269,19 @@ function concepts() {
   });
 }
 
-/* 빈출순 연도 범위. fy1~fy2 는 두 자리 연도('22'), 비어 있으면 끝까지. */
-var FK = 'pd_frange';
+/* 빈출순 연도 범위. fy1~fy2 는 두 자리 연도('22'), 비어 있으면 끝까지.
+   문제집마다 'pd_frange:<id>' 에 따로 둔다. 문제집별로 나누기 전의 공통 'pd_frange' 는
+   전기기사(ek)에서만 이어 쓰고 지우지 않는다 — 예전 버전으로 되돌려도 범위가 보이게. */
 var FR = { fy1: '', fy2: '' };
-try { Object.assign(FR, JSON.parse(localStorage.getItem(FK) || '{}')); } catch (e) {}
-function frSave() { try { localStorage.setItem(FK, JSON.stringify(FR)); } catch (e) {} }
+function frLoad() {
+  FR = { fy1: '', fy2: '' };
+  try {
+    var v = localStorage.getItem('pd_frange:' + CUR);
+    if (v == null && CUR === 'ek') v = localStorage.getItem('pd_frange');
+    Object.assign(FR, JSON.parse(v || '{}'));
+  } catch (e) {}
+}
+function frSave() { if (!CUR) return; try { localStorage.setItem('pd_frange:' + CUR, JSON.stringify(FR)); } catch (e) {} }
 /* 회차 이름에 연도가 있는 연도들, 오래된 것부터. 정렬 비교마다 불리니 문제집별로 한 번만 센다. */
 var FYC = { it: null, ys: [] };
 function freqYears() {
@@ -1079,6 +1087,7 @@ function activate(d) {
   try { localStorage.setItem(CURK, CUR); } catch (e) {}
   PK = 'pd_prog:' + CUR;
   loadProg();
+  frLoad();
   if (changed) {
     S = { list: [], pos: 0, graded: false, marks: {}, label: '' };
     $('#cdetail').innerHTML = '';
@@ -1190,7 +1199,7 @@ function removeDeck(id) {
   var m = libGet(id);
   if (!m || !confirm('"' + (m.title || id) + '" 문제집과 그 진도 기록을 이 기기에서 지웁니다.')) return;
   idbDel(dsKey(id)).then(function () {
-    try { localStorage.removeItem('pd_prog:' + id); } catch (e) {}
+    try { localStorage.removeItem('pd_prog:' + id); localStorage.removeItem('pd_frange:' + id); } catch (e) {}
     LIB = LIB.filter(function (x) { return x.id !== id; });
     libSave();
     if (CUR === id) {
