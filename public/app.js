@@ -274,11 +274,14 @@ var FK = 'pd_frange';
 var FR = { fy1: '', fy2: '' };
 try { Object.assign(FR, JSON.parse(localStorage.getItem(FK) || '{}')); } catch (e) {}
 function frSave() { try { localStorage.setItem(FK, JSON.stringify(FR)); } catch (e) {} }
-/* 회차 이름에 연도가 있는 연도들, 오래된 것부터 */
+/* 회차 이름에 연도가 있는 연도들, 오래된 것부터. 정렬 비교마다 불리니 문제집별로 한 번만 센다. */
+var FYC = { it: null, ys: [] };
 function freqYears() {
+  if (FYC.it === IT) return FYC.ys;
   var ys = {};
   IT.forEach(function (it) { it.r.forEach(function (r) { var y = ryear(r); if (y) ys[y] = 1; }); });
-  return Object.keys(ys).sort();
+  FYC = { it: IT, ys: Object.keys(ys).sort() };
+  return FYC.ys;
 }
 function frBounds() {
   var ys = freqYears();
